@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "406602129912",
+    "project_id": "heartpital-f867a",
+    "storage_bucket": "heartpital-f867a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:406602129912:android:ce18965cafb66f430fb60d",
+        "android_client_info": {
+          "package_name": "com.example.heartpital_v1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDn_w0LuF5AT3_8p8lV8-TORcUX0uGbxLw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
