@@ -1,3 +1,4 @@
+// lib/screens/add_edit_patient_screen.dart
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/patient_model.dart';
@@ -5,6 +6,8 @@ import '../models/notification_model.dart';
 import '../services/patient_service.dart';
 import '../services/notification_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/user_service.dart'; // เพิ่ม import นี้
+import '../models/user_model.dart'; // เพิ่ม import นี้
 
 class AddEditPatientScreen extends StatefulWidget {
   final Patient? patient;
@@ -19,9 +22,9 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
   final _formKey = GlobalKey<FormState>();
   final PatientService _patientService = PatientService();
   final NotificationService _notificationService = NotificationService();
-  
+  final UserService _userService = UserService(); // สร้าง instance ของ UserService
+
   late TextEditingController _nameController;
-  late TextEditingController _doctorController;
   late TextEditingController _notificationDetailController;
   
   String? _selectedBuilding;
@@ -30,6 +33,10 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
   TimeOfDay? _selectedNotificationTime;
   bool _isNPO = false;
   bool _isLoading = false;
+  
+  // เพิ่มตัวแปรสำหรับรายชื่อแพทย์
+  List<User> _doctors = [];
+  String? _selectedDoctorName;
   
   // รายการตึก
   final List<String> _buildings = ['A', 'B', 'C', 'D', 'E'];
@@ -53,7 +60,6 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
     'การให้ยาและหัตถการ',
     'การตรวจร่างกายและประเมินอาการ', 
     'การดูแลช่วยเหลือผู้ป่วยในชีวิตประจำวัน',
-    'การให้คำแนะนำและสนับสนุนจิตใจ',
     'การประสานงานกับทีมแพทย์และบุคลากรอื่น',
     'การเฝ้าระวังและป้องกันโรค/การติดเชื้อ'
   ];
@@ -64,11 +70,9 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.patient?.name);
-    _doctorController = TextEditingController(text: widget.patient?.doctorName);
     _notificationDetailController = TextEditingController();
     
     if (widget.patient != null) {
-      // แยกตึกออกจาก location (เช่น "ตึก A ชั้น 3" -> "A")
       final location = widget.patient!.location;
       for (String building in _buildings) {
         if (location.contains(building)) {
@@ -83,17 +87,29 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
     
     _selectedDepartment = widget.patient?.department ?? _departments.first;
     _isNPO = widget.patient?.isNPO ?? false;
+    _selectedDoctorName = widget.patient?.doctorName;
+    
+    _fetchDoctors();
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _doctorController.dispose();
     _notificationDetailController.dispose();
     super.dispose();
   }
 
-  // ฟังก์ชันสำหรับสร้าง HN อัตโนมัติ
+  Future<void> _fetchDoctors() async {
+    final doctorsStream = _userService.getUsers();
+    final doctorsList = await doctorsStream.first;
+    setState(() {
+      _doctors = doctorsList;
+      if (!isEditing && _doctors.isNotEmpty) {
+        _selectedDoctorName = _doctors.first.name;
+      }
+    });
+  }
+
   Future<String> _generateHN() async {
     try {
       final snapshot = await FirebaseFirestore.instance
@@ -103,14 +119,13 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
           .get();
       
       if (snapshot.docs.isEmpty) {
-        return '001001'; // HN เริ่มต้น
+        return '001001';
       }
       
       final lastHN = snapshot.docs.first.data()['hn'] as String;
       final nextNumber = int.parse(lastHN) + 1;
       return nextNumber.toString().padLeft(6, '0');
     } catch (e) {
-      // หากเกิดข้อผิดพลาด ใช้ timestamp แทน
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       return (timestamp % 1000000).toString().padLeft(6, '0');
     }
@@ -134,8 +149,8 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
           id: widget.patient?.id,
           name: _nameController.text.trim(),
           hn: hn,
-          location: 'ตึก $_selectedBuilding', // จัดเก็บรูปแบบ "ตึก A"
-          doctorName: _doctorController.text.trim(),
+          location: 'ตึก $_selectedBuilding',
+          doctorName: _selectedDoctorName!,
           department: _selectedDepartment!,
           isNPO: _isNPO,
         );
@@ -151,7 +166,6 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
           patientId = docRef.id;
         }
 
-        // เพิ่มการแจ้งเตือนหากระบุข้อมูลครบ
         if (_selectedNotificationType != null && 
             _selectedNotificationTime != null &&
             _notificationDetailController.text.trim().isNotEmpty &&
@@ -240,7 +254,7 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
               
               _buildBuildingDropdown(),
               _buildDepartmentDropdown(),
-              _buildTextField('แพทย์เจ้าของไข้', Icons.local_hospital_outlined, _doctorController),
+              _buildDoctorDropdown(), // ใช้ Dropdown แทน TextField
               _buildNPOCheckbox(),
               
               // ส่วนการแจ้งเตือน (สำหรับผู้ป่วยใหม่เท่านั้น)
@@ -411,6 +425,33 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
         ).toList(),
         onChanged: (val) => setState(() => _selectedDepartment = val),
         validator: (v) => v == null ? 'กรุณาเลือกแผนก' : null,
+      ),
+    );
+  }
+
+  Widget _buildDoctorDropdown() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: DropdownButtonFormField<String>(
+        value: _selectedDoctorName,
+        decoration: InputDecoration(
+          labelText: 'แพทย์เจ้าของไข้',
+          prefixIcon: const Icon(Icons.local_hospital_outlined),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          filled: true,
+          fillColor: Colors.white,
+        ),
+        items: _doctors.map((doctor) => 
+          DropdownMenuItem(
+            value: doctor.name,
+            child: Text('${doctor.name} (${doctor.position})', style: GoogleFonts.kanit()),
+          )
+        ).toList(),
+        onChanged: (val) => setState(() => _selectedDoctorName = val),
+        validator: (v) => v == null ? 'กรุณาเลือกแพทย์' : null,
       ),
     );
   }

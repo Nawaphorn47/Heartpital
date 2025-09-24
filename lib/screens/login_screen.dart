@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // เพิ่ม import นี้
 import 'main_screen_scaffold.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -15,15 +16,19 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _nameController = TextEditingController(); // เพิ่ม TextEditingController สำหรับชื่อ
+  final _positionController = TextEditingController(); // เพิ่ม TextEditingController สำหรับตำแหน่ง
   final _auth = FirebaseAuth.instance;
 
   bool _isLoading = false;
-  bool _isLogin = true; // State เพื่อสลับระหว่าง Login และ Sign Up
+  bool _isLogin = true;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _nameController.dispose();
+    _positionController.dispose();
     super.dispose();
   }
 
@@ -33,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
     _formKey.currentState?.save();
-    
+
     setState(() {
       _isLoading = true;
     });
@@ -45,12 +50,25 @@ class _LoginScreenState extends State<LoginScreen> {
           password: _passwordController.text.trim(),
         );
       } else {
-        await _auth.createUserWithEmailAndPassword(
+        // สมัครสมาชิก
+        final userCredential = await _auth.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
+
+        // บันทึกข้อมูลผู้ใช้เพิ่มเติมลงใน Firestore
+        if (userCredential.user != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userCredential.user!.uid)
+              .set({
+            'name': _nameController.text.trim(),
+            'position': _positionController.text.trim(),
+            'email': _emailController.text.trim(),
+          });
+        }
       }
-      // นำทางไปยังหน้าหลักเมื่อสำเร็จ
+
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const MainScreenScaffold()),
@@ -116,6 +134,43 @@ class _LoginScreenState extends State<LoginScreen> {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 24),
+                        // เพิ่มช่องสำหรับชื่อและตำแหน่งสำหรับโหมดสมัครสมาชิก
+                        if (!_isLogin) ...[
+                          TextFormField(
+                            controller: _nameController,
+                            decoration: InputDecoration(
+                              labelText: 'ชื่อ-นามสกุล',
+                              prefixIcon: const Icon(Icons.person_outline),
+                              filled: true,
+                              fillColor: const Color(0xFFF0F2F5),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'กรุณาใส่ชื่อ';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _positionController,
+                            decoration: InputDecoration(
+                              labelText: 'ตำแหน่ง',
+                              prefixIcon: const Icon(Icons.badge_outlined),
+                              filled: true,
+                              fillColor: const Color(0xFFF0F2F5),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'กรุณาใส่ตำแหน่ง';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         TextFormField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
