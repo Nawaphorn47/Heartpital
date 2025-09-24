@@ -33,11 +33,7 @@ class MyApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           title: 'Patient Management App',
 
-          /*themeMode: themeProvider.themeMode,
-          // *** แก้ไข 2 บรรทัดนี้
-          theme: ThemeProvider.lightTheme,
-          darkTheme: ThemeProvider.darkTheme,
-          // */
+         
 
           initialRoute: '/',
           routes: {

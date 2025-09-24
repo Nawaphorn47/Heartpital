@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // เพิ่ม import นี้
+import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/user_service.dart';
+import '../models/user_model.dart';
 import 'main_screen_scaffold.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -15,9 +17,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _nameController = TextEditingController(); // เพิ่ม TextEditingController สำหรับชื่อ
-  final _positionController = TextEditingController(); // เพิ่ม TextEditingController สำหรับตำแหน่ง
-  final _auth = FirebaseAuth.instance;
+  final _nameController = TextEditingController();
+  final _positionController = TextEditingController();
+  final _auth = auth.FirebaseAuth.instance;
+  final _userService = UserService();
 
   bool _isLoading = false;
   bool _isLogin = true;
@@ -50,21 +53,21 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       } else {
         // สมัครสมาชิก
-        final userCredential = await _auth.createUserWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
+        final auth.UserCredential userCredential = await _auth
+            .createUserWithEmailAndPassword(
+              email: _emailController.text.trim(),
+              password: _passwordController.text.trim(),
+            );
 
         // บันทึกข้อมูลผู้ใช้เพิ่มเติมลงใน Firestore
         if (userCredential.user != null) {
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(userCredential.user!.uid)
-              .set({
-            'name': _nameController.text.trim(),
-            'position': _positionController.text.trim(),
-            'email': _emailController.text.trim(),
-          });
+          final newUser = User(
+            id: userCredential.user!.uid,
+            name: _nameController.text.trim(),
+            position: _positionController.text.trim(),
+            email: _emailController.text.trim(),
+          );
+          await _userService.addUser(newUser);
         }
       }
 
@@ -73,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (context) => const MainScreenScaffold()),
         );
       }
-    } on FirebaseAuthException catch (e) {
+    } on auth.FirebaseAuthException catch (e) {
       String errorMessage = 'เกิดข้อผิดพลาดในการยืนยันตัวตน';
       if (e.code == 'weak-password') {
         errorMessage = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
@@ -133,7 +136,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 24),
-                        // เพิ่มช่องสำหรับชื่อและตำแหน่งสำหรับโหมดสมัครสมาชิก
                         if (!_isLogin) ...[
                           TextFormField(
                             controller: _nameController,
@@ -142,7 +144,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               prefixIcon: const Icon(Icons.person_outline),
                               filled: true,
                               fillColor: const Color(0xFFF0F2F5),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(30),
+                                borderSide: BorderSide.none,
+                              ),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -159,7 +164,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               prefixIcon: const Icon(Icons.badge_outlined),
                               filled: true,
                               fillColor: const Color(0xFFF0F2F5),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(30),
+                                borderSide: BorderSide.none,
+                              ),
                             ),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
@@ -178,10 +186,15 @@ class _LoginScreenState extends State<LoginScreen> {
                             prefixIcon: const Icon(Icons.email_outlined),
                             filled: true,
                             fillColor: const Color(0xFFF0F2F5),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(30),
+                              borderSide: BorderSide.none,
+                            ),
                           ),
                           validator: (value) {
-                            if (value == null || value.isEmpty || !value.contains('@')) {
+                            if (value == null ||
+                                value.isEmpty ||
+                                !value.contains('@')) {
                               return 'กรุณาใส่อีเมลที่ถูกต้อง';
                             }
                             return null;
@@ -196,10 +209,15 @@ class _LoginScreenState extends State<LoginScreen> {
                             prefixIcon: const Icon(Icons.lock_outline),
                             filled: true,
                             fillColor: const Color(0xFFF0F2F5),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(30),
+                              borderSide: BorderSide.none,
+                            ),
                           ),
                           validator: (value) {
-                            if (value == null || value.isEmpty || value.length < 6) {
+                            if (value == null ||
+                                value.isEmpty ||
+                                value.length < 6) {
                               return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
                             }
                             return null;
@@ -213,13 +231,18 @@ class _LoginScreenState extends State<LoginScreen> {
                               onPressed: () {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('คุณเลือก "ลืมรหัสผ่าน?"', style: GoogleFonts.kanit()),
+                                    content: Text(
+                                      'คุณเลือก "ลืมรหัสผ่าน?"',
+                                      style: GoogleFonts.kanit(),
+                                    ),
                                   ),
                                 );
                               },
                               child: Text(
                                 'ลืมรหัสผ่าน?',
-                                style: GoogleFonts.kanit(color: theme.colorScheme.primary),
+                                style: GoogleFonts.kanit(
+                                  color: theme.colorScheme.primary,
+                                ),
                               ),
                             ),
                           ),
@@ -231,7 +254,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             onPressed: _submitAuthForm,
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
                             ),
                             child: Text(
                               _isLogin ? 'เข้าสู่ระบบ' : 'สมัครสมาชิก',
