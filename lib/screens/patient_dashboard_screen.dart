@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:percent_indicator/percent_indicator.dart';
-import 'package:animated_text_kit/animated_text_kit.dart';
+//import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'dart:ui';
 import '../services/patient_service.dart';
@@ -17,7 +17,7 @@ class PatientDashboardScreen extends StatefulWidget {
 
 class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
   final PatientService _patientService = PatientService();
-  String _groupBy = 'แผนก';
+  final String _groupBy = 'แผนก'; // คงค่าเดิมไว้
 
   @override
   Widget build(BuildContext context) {
@@ -79,26 +79,26 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
     );
   }
 
+  // ⭐️ [IMPROVED] ปรับปรุง SliverAppBar ให้สวยงามและมีมิติมากขึ้น
   Widget _buildSliverAppBar() {
     const Color accentColor = Color(0xFF0D47A1);
 
     return SliverAppBar(
-      expandedHeight: 180.0,
+      expandedHeight: 130.0,
       pinned: true,
-      elevation: 0,
-      backgroundColor: const Color(0xFFBAE2FF),
-      // เราจะใช้ title ของ FlexibleSpaceBar เพื่อให้มัน animate ได้
+      elevation: 2,
+      backgroundColor: Colors.white, // เปลี่ยนสีพื้นหลังตอนหดเป็นสีขาว
+      foregroundColor: accentColor, // เปลี่ยนสีไอคอนย้อนกลับ
       flexibleSpace: FlexibleSpaceBar(
-        // title จะลดขนาดและเคลื่อนที่ไปอยู่บน App Bar อัตโนมัติ
+        centerTitle: true,
+        titlePadding: const EdgeInsets.only(bottom: 16),
         title: Text(
-          'Dashboard',
+          'ภาพรวมข้อมูล',
           style: GoogleFonts.kanit(
             color: accentColor,
             fontWeight: FontWeight.bold,
           ),
         ),
-        centerTitle: true, // จัดให้อยู่ตรงกลางเมื่อหด
-        titlePadding: const EdgeInsets.only(bottom: 16), // ระยะห่างของ title
         background: Stack(
           fit: StackFit.expand,
           children: [
@@ -108,26 +108,28 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    const Color(0xFFBAE2FF),
+                    const Color(0xFFBAE2FF).withOpacity(0.8),
                     const Color(0xFF81D4FA).withOpacity(0.5),
                   ],
                 ),
               ),
             ),
-            // ไอคอนตกแต่งพื้นหลัง
-            // const Center(
-            //   child: Icon(
-            //     Icons.bar_chart_rounded,
-            //     size: 100,
-            //     color: Color(0xFF0D47A1),
-            //   ),
-            // ),
+             Positioned(
+              bottom: -20,
+              right: -20,
+              child: Icon(
+                Icons.bar_chart_rounded,
+                size: 150,
+                color: Colors.white.withOpacity(0.3),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
+  // ฟังก์ชันเดิม ไม่เปลี่ยนแปลง
   Map<String, int> _getCounts(List<Patient> patients, String type) {
     final Map<String, int> counts = {};
     for (var patient in patients) {
@@ -137,33 +139,38 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
     return counts;
   }
 
-  Widget _buildStatCards(int total, int npoCount) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildSoftUICard(
-            'ผู้ป่วยทั้งหมด',
-            total.toString(),
-            Icons.groups_2_outlined,
-            const Color(0xFF0D47A1),
+  // ⭐️ [IMPROVED] ปรับปรุง Layout ของ StatCards
+   Widget _buildStatCards(int total, int npoCount) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: _buildInfoCard(
+              'ผู้ป่วยทั้งหมด',
+              total.toString(),
+              Icons.groups_2_outlined,
+              const Color(0xFF0D47A1),
+            ),
           ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _buildSoftUICard(
-            'งดน้ำ-อาหาร (NPO)',
-            npoCount.toString(),
-            Icons.no_food_outlined,
-            Colors.orange.shade800,
-            totalCount: total,
-            currentCount: npoCount,
+          const SizedBox(width: 16),
+          Expanded(
+            child: _buildInfoCard(
+              'งดน้ำ-อาหาร (NPO)',
+              npoCount.toString(),
+              Icons.no_food_outlined,
+              Colors.orange.shade800,
+              totalCount: total,
+              currentCount: npoCount,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
   
-  Widget _buildSoftUICard(String title, String count, IconData icon, Color color,
+  // ⭐️ [NEW] สร้าง Widget Card ใหม่ที่ดูโปรขึ้น
+  Widget _buildInfoCard(String title, String count, IconData icon, Color color,
       {int? totalCount, int? currentCount}) {
     double percentage = 0;
     if (totalCount != null && currentCount != null && totalCount > 0) {
@@ -173,32 +180,29 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
     return Container(
       padding: const EdgeInsets.all(16.0),
       decoration: BoxDecoration(
-        color: const Color(0xFFE0F7FA).withOpacity(0.7), // สีพื้นหลังของการ์ด
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.white.withOpacity(0.9),
-            offset: const Offset(-5, -5),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
-          ),
-          BoxShadow(
-            color: Colors.blue.shade100.withOpacity(0.5),
-            offset: const Offset(5, 5),
-            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
+        border: Border(left: BorderSide(color: color, width: 5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(icon, color: color, size: 28),
+              Icon(icon, color: color, size: 32),
               if (totalCount != null)
                 CircularPercentIndicator(
-                  radius: 20.0,
-                  lineWidth: 6.0,
+                  radius: 22.0,
+                  lineWidth: 5.0,
                   percent: percentage,
                   center: Text("${(percentage * 100).toInt()}%", style: GoogleFonts.kanit(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
                   progressColor: color,
@@ -207,8 +211,13 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Text(count, style: GoogleFonts.kanit(fontSize: 28, fontWeight: FontWeight.bold, color: color)),
-          Text(title, style: GoogleFonts.kanit(fontSize: 14, color: color.withOpacity(0.8))),
+          Column(
+             crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(count, style: GoogleFonts.kanit(fontSize: 32, fontWeight: FontWeight.bold, color: color)),
+              Text(title, style: GoogleFonts.kanit(fontSize: 14, color: Colors.grey.shade600)),
+            ],
+          ),
         ],
       ),
     );
@@ -224,6 +233,7 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
     );
   }
 
+  // ⭐️ [IMPROVED] ปรับปรุงดีไซน์ของ Container ที่ครอบ Chart
   Widget _buildChart(Map<String, int> data) {
     final sortedEntries = data.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
@@ -231,11 +241,14 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
       height: 220,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFE0F7FA).withOpacity(0.7),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(color: Colors.white.withOpacity(0.9), offset: const Offset(-5, -5), blurRadius: 10),
-          BoxShadow(color: Colors.blue.shade100.withOpacity(0.5), offset: const Offset(5, 5), blurRadius: 10),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+         boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: BarChart(
@@ -265,6 +278,7 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
               sideTitles: SideTitles(
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
+                  if (value.toInt() >= sortedEntries.length) return const SizedBox.shrink();
                   final title = sortedEntries[value.toInt()].key;
                   return Padding(
                     padding: const EdgeInsets.only(top: 8.0),
@@ -283,12 +297,12 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
           barTouchData: BarTouchData(
             touchTooltipData: BarTouchTooltipData(
               tooltipBgColor: const Color(0xFF0D47A1),
-              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+               getTooltipItem: (group, groupIndex, rod, rodIndex) {
                 final title = sortedEntries[groupIndex].key;
                 return BarTooltipItem(
                   '$title\n',
-                  GoogleFonts.kanit(color: Colors.white, fontWeight: FontWeight.bold),
-                  children: [TextSpan(text: '${rod.toY.toInt()} คน', style: GoogleFonts.kanit(color: Colors.cyanAccent, fontWeight: FontWeight.bold))],
+                  GoogleFonts.kanit(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                  children: [TextSpan(text: '${rod.toY.toInt()} คน', style: GoogleFonts.kanit(color: Colors.cyanAccent, fontWeight: FontWeight.normal, fontSize: 12))],
                 );
               },
             ),
@@ -298,50 +312,65 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
     );
   }
 
+  // ⭐️ [IMPROVED] ปรับปรุงดีไซน์ของรายการรายละเอียด
   Widget _buildDetailList(Map<String, int> data, int totalCount) {
     final sortedEntries = data.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
-    return Column(
-      children: List.generate(sortedEntries.length, (index) {
-        final entry = sortedEntries[index];
-        final color = _getChartColor(index);
-        final percentage = totalCount > 0 ? entry.value / totalCount : 0.0;
-
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(entry.key, style: GoogleFonts.kanit(fontWeight: FontWeight.w500, color: const Color(0xFF0D47A1))),
-                  Text('${entry.value} คน', style: GoogleFonts.kanit(fontWeight: FontWeight.bold, color: color)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              LinearPercentIndicator(
-                percent: percentage,
-                lineHeight: 8,
-                barRadius: const Radius.circular(4),
-                progressColor: color,
-                backgroundColor: color.withOpacity(0.2),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.all(12),
+       decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+         boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-        );
-      }),
+        ],
+      ),
+      child: Column(
+        children: List.generate(sortedEntries.length, (index) {
+          final entry = sortedEntries[index];
+          final color = _getChartColor(index);
+          final percentage = totalCount > 0 ? entry.value / totalCount : 0.0;
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12.0),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(entry.key, style: GoogleFonts.kanit(fontWeight: FontWeight.w500, color: const Color(0xFF0D47A1))),
+                    Text('${entry.value} คน', style: GoogleFonts.kanit(fontWeight: FontWeight.bold, color: color)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                LinearPercentIndicator(
+                  percent: percentage,
+                  lineHeight: 8,
+                  barRadius: const Radius.circular(4),
+                  progressColor: color,
+                  backgroundColor: color.withOpacity(0.2),
+                ),
+              ],
+            ),
+          );
+        }),
+      ),
     );
   }
 
   Color _getChartColor(int index) {
     final colors = [
       const Color(0xFF0D47A1),
-      Colors.green.shade600,
-      Colors.orange.shade800,
-      Colors.purple.shade600,
-      Colors.red.shade600,
-      Colors.teal.shade600,
-      Colors.pink.shade600,
+      Colors.green.shade200,
+      Colors.orange.shade200,
+      Colors.purple.shade200,
+      Colors.red.shade200,
+      Colors.teal.shade200,
+      Colors.pink.shade200,
     ];
     return colors[index % colors.length];
   }

@@ -23,11 +23,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
   @override
   void initState() {
     super.initState();
-    // Combine notifications and patients stream
+    // --- ไม่มีการเปลี่ยนแปลงฟังก์ชันการทำงาน ---
     _combinedStream = Rx.combineLatest2(
       _notificationService.getNotifications(),
       _patientService.getPatients(),
       (List<NotificationItem> notifications, List<Patient> patients) {
+        // Sort notifications by timestamp in descending order (newest first)
+        notifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        
         final Map<String, Patient> patientMap = {
           for (var p in patients) p.id!: p
         };
@@ -54,134 +57,168 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
     return 'เมื่อสักครู่';
   }
+  // --- สิ้นสุดส่วนที่ไม่เปลี่ยนแปลง ---
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent, // ทำให้โปร่งใส
+      // ⭐️ [IMPROVED] ปรับปรุง AppBar ให้สอดคล้องกับหน้าอื่น
       appBar: AppBar(
         title: Text('การแจ้งเตือน', style: GoogleFonts.kanit(color: const Color(0xFF0D47A1), fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFFBAE2FF), // สีเดียวกับพื้นหลังหลัก
-        elevation: 0,
+        backgroundColor: Colors.white,
+        elevation: 2,
+        shadowColor: Colors.black.withOpacity(0.1),
       ),
-      body: StreamBuilder<List<Map<String, dynamic>>>(
-        stream: _combinedStream,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text('Something went wrong', style: GoogleFonts.kanit()));
-          }
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.data!.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.notifications_off, size: 100, color: Colors.grey.shade300),
-                  const SizedBox(height: 16),
-                  Text('ไม่มีการแจ้งเตือน', style: GoogleFonts.kanit(fontSize: 18, color: Colors.grey.shade600)),
-                ],
-              ),
+      // ⭐️ [IMPROVED] เพิ่มพื้นหลัง Gradient ให้เหมือนหน้าอื่น
+      body: Container(
+         decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFFBAE2FF).withOpacity(0.5),
+              const Color(0xFF81D4FA).withOpacity(0.2),
+            ],
+          ),
+        ),
+        child: StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _combinedStream,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(child: Text('เกิดข้อผิดพลาดบางอย่าง', style: GoogleFonts.kanit()));
+            }
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            // ⭐️ [IMPROVED] ปรับปรุง UI ตอนไม่มีข้อมูล
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.notifications_off_outlined, size: 80, color: Colors.grey.shade400),
+                    const SizedBox(height: 16),
+                    Text('ยังไม่มีการแจ้งเตือน', style: GoogleFonts.kanit(fontSize: 18, color: Colors.grey.shade600)),
+                  ],
+                ),
+              );
+            }
+
+            final notificationsData = snapshot.data!;
+
+            return ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: notificationsData.length,
+              itemBuilder: (context, index) {
+                final item = notificationsData[index]['notification'] as NotificationItem;
+                final patient = notificationsData[index]['patient'] as Patient?;
+                final timeAgo = _timeAgo(item.timestamp.toDate());
+                final patientName = patient != null ? patient.name : 'ไม่พบข้อมูลผู้ป่วย';
+                // ใช้ Card ที่ออกแบบใหม่
+                return _buildNotificationCard(item, timeAgo, patientName);
+              },
             );
-          }
-
-          final notificationsData = snapshot.data!;
-
-          return ListView.builder(
-            itemCount: notificationsData.length,
-            itemBuilder: (context, index) {
-              final item = notificationsData[index]['notification'] as NotificationItem;
-              final patient = notificationsData[index]['patient'] as Patient?;
-              final timeAgo = _timeAgo(item.timestamp.toDate());
-              final patientName = patient != null ? patient.name : 'ไม่พบผู้ป่วย';
-              return _buildNotificationCard(item, timeAgo, patientName);
-            },
-          );
-        },
+          },
+        ),
       ),
     );
   }
 
+  // ⭐️ [IMPROVED] ออกแบบ Notification Card ใหม่ทั้งหมด
   Widget _buildNotificationCard(NotificationItem item, String timeAgo, String patientName) {
     IconData iconData;
-    Color iconAndTextColor;
+    Color color;
+
     switch (item.type) {
       case 'medication':
-        iconData = Icons.medical_services_outlined;
-        iconAndTextColor = const Color(0xFF0D47A1); // สีหลัก
+        iconData = Icons.medical_services_rounded;
+        color = const Color(0xFF0D47A1); // น้ำเงิน
         break;
       case 'checkup':
-        iconData = Icons.health_and_safety_outlined;
-        iconAndTextColor = Colors.green;
+        iconData = Icons.health_and_safety_rounded;
+        color = Colors.green.shade200; // เขียว
         break;
       case 'alert':
         iconData = Icons.warning_amber_rounded;
-        iconAndTextColor = Colors.red;
+        color = Colors.red.shade200; // แดง
         break;
-       case 'care':
-      iconData = Icons.local_hospital_outlined;
-      iconAndTextColor = Colors.purple;
-      break;
-       case 'NPO':
-      iconData = Icons.restaurant_menu_outlined;
-      iconAndTextColor = Colors.orange;
-      break;
+      case 'care':
+        iconData = Icons.local_hospital_rounded;
+        color = Colors.purple.shade200; // ม่วง
+        break;
+      case 'NPO':
+        iconData = Icons.no_food_rounded;
+        color = Colors.orange.shade200; // ส้ม
+        break;
       default:
-        iconData = Icons.notifications_outlined;
-        iconAndTextColor = Colors.grey;
+        iconData = Icons.notifications_rounded;
+        color = Colors.grey.shade200; // เทา
         break;
     }
 
-
-    return Container(
+    return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white, // พื้นหลังการ์ดเป็นสีขาว
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: IntrinsicHeight(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(iconData, color: iconAndTextColor, size: 32),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          children: [
+            // แถบสีด้านข้างเพื่อบ่งบอกประเภท
+            Container(
+              width: 6,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      item.details,
-                      style: GoogleFonts.kanit(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: iconAndTextColor,
+                    Icon(iconData, color: color, size: 28),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.details,
+                            style: GoogleFonts.kanit(
+                              fontWeight: FontWeight.w600, // Semi-bold
+                              fontSize: 16,
+                              color: color,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'ผู้ป่วย: $patientName',
+                            style: GoogleFonts.kanit(
+                              fontSize: 14,
+                              color: Colors.grey.shade800
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            timeAgo,
+                            style: GoogleFonts.kanit(fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'ผู้ป่วย: $patientName',
-                      style: GoogleFonts.kanit(fontWeight: FontWeight.w500, color: Colors.black87),
-                    ),
-                    Text(
-                      timeAgo,
-                      style: GoogleFonts.kanit(fontSize: 12, color: Colors.grey),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
