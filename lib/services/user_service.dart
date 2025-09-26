@@ -1,3 +1,4 @@
+// lib/services/user_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 
@@ -15,5 +16,22 @@ class UserService {
           .map((doc) => User.fromJson(doc.data() as Map<String, dynamic>, doc.id))
           .toList();
     });
+  }
+  
+  // [NEW] เพิ่มฟังก์ชันนี้เข้าไป
+  /// ดึงข้อมูลผู้ใช้คนเดียวจาก ID
+  Future<User?> getUserById(String id) async {
+    final docSnapshot = await _collection.doc(id).get();
+    if (docSnapshot.exists) {
+      return User.fromJson(docSnapshot.data() as Map<String, dynamic>, docSnapshot.id);
+    }
+    return null;
+  }
+
+  Future<void> updateUser(User user) async {
+    if (user.id == null) {
+      throw Exception("User ID cannot be null for updating.");
+    }
+    await _collection.doc(user.id).update(user.toJson());
   }
 }

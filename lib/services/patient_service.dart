@@ -1,12 +1,35 @@
+// lib/services/patient_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/patient_model.dart';
 
 class PatientService {
   final CollectionReference _collection = FirebaseFirestore.instance.collection(Patient.CollectionName);
 
-  Stream<List<Patient>> getPatients() {
-    return _collection.snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) => Patient.fromJson(doc.data() as Map<String, dynamic>, doc.id)).toList();
+  Stream<List<Patient>> getPatients({String? building, String? department, String? searchQuery}) {
+    Query query = _collection;
+
+    if (building != null && building != 'ทุกตึก') {
+      query = query.where('location', isEqualTo: building);
+    }
+    if (department != null && department != 'ทุกแผนก') {
+      query = query.where('department', isEqualTo: department);
+    }
+    // การค้นหาจะทำใน patient_list_screen หลังจากได้ข้อมูลที่กรองแล้ว
+    // Firestore ไม่รองรับการค้นหาแบบ full-text search ในหลายๆ field พร้อมกันโดยตรง
+    // หากต้องการประสิทธิภาพการค้นหาที่ดีกว่านี้ อาจต้องใช้บริการเสริมเช่น Algolia หรือ Elasticsearch
+
+    return query.snapshots().map((snapshot) {
+      var patients = snapshot.docs.map((doc) => Patient.fromJson(doc.data() as Map<String, dynamic>, doc.id)).toList();
+      
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        final lowerCaseQuery = searchQuery.toLowerCase();
+        patients = patients.where((patient) {
+          return patient.name.toLowerCase().contains(lowerCaseQuery) ||
+                 patient.hn.toLowerCase().contains(lowerCaseQuery);
+        }).toList();
+      }
+      
+      return patients;
     });
   }
 
@@ -24,6 +47,4 @@ class PatientService {
   Future<void> deletePatient(String patientId) async {
     await _collection.doc(patientId).delete();
   }
-
-  generateNewHN() {}
 }

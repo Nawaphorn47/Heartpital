@@ -1,12 +1,27 @@
+// lib/screens/patient_dashboard_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:percent_indicator/percent_indicator.dart';
-//import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'dart:ui';
 import '../services/patient_service.dart';
 import '../models/patient_model.dart';
+import 'dart:async';
+
+// [NEW] สร้าง Model เพื่อจัดเก็บข้อมูลสถิติให้เป็นระเบียบ
+class DashboardStats {
+  final int totalCount;
+  final int npoCount;
+  final Map<String, int> departmentCounts;
+
+  DashboardStats({
+    required this.totalCount,
+    required this.npoCount,
+    required this.departmentCounts,
+  });
+}
 
 class PatientDashboardScreen extends StatefulWidget {
   const PatientDashboardScreen({super.key});
@@ -17,14 +32,41 @@ class PatientDashboardScreen extends StatefulWidget {
 
 class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
   final PatientService _patientService = PatientService();
-  final String _groupBy = 'แผนก'; // คงค่าเดิมไว้
+  // [OPTIMIZED] สร้าง Stream ที่แปลงข้อมูลดิบให้เป็นข้อมูลสถิติเลย
+  late final Stream<DashboardStats> _statsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    // [OPTIMIZED] ใช้ .map เพื่อแปลง List<Patient> เป็น DashboardStats
+    // การคำนวณจะเกิดขึ้นใน Stream pipeline ทำให้โค้ดใน-ส่วน UI สะอาดขึ้น
+    _statsStream = _patientService.getPatients().map((patients) {
+      final departmentCounts = _getCounts(patients, 'department');
+      final npoCount = patients.where((p) => p.isNPO).length;
+      return DashboardStats(
+        totalCount: patients.length,
+        npoCount: npoCount,
+        departmentCounts: departmentCounts,
+      );
+    });
+  }
+
+  Map<String, int> _getCounts(List<Patient> patients, String type) {
+    final Map<String, int> counts = {};
+    for (var patient in patients) {
+      final key = type == 'department' ? patient.department : patient.location;
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent, // ทำให้โปร่งใสเพื่อรับสีจาก Scaffold หลัก
-      body: StreamBuilder<List<Patient>>(
-        stream: _patientService.getPatients(),
+      backgroundColor: Colors.transparent,
+      body: StreamBuilder<DashboardStats>(
+        // [OPTIMIZED] ฟังจาก Stream ที่แปลงข้อมูลแล้ว
+        stream: _statsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -32,14 +74,11 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
           if (snapshot.hasError) {
             return Center(child: Text('เกิดข้อผิดพลาด: ${snapshot.error}', style: GoogleFonts.kanit()));
           }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          if (!snapshot.hasData) {
             return Center(child: Text('ไม่มีข้อมูลผู้ป่วย', style: GoogleFonts.kanit()));
           }
 
-          final patients = snapshot.data!;
-          final departmentCounts = _getCounts(patients, 'department');
-          final npoCount = patients.where((p) => p.isNPO).length;
-          final totalCount = patients.length;
+          final stats = snapshot.data!;
 
           return CustomScrollView(
             slivers: [
@@ -57,15 +96,15 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
                           child: FadeInAnimation(child: widget),
                         ),
                         children: [
-                          _buildStatCards(totalCount, npoCount),
+                          _buildStatCards(stats.totalCount, stats.npoCount),
                           const SizedBox(height: 24),
-                          _buildSectionTitle('จำนวนผู้ป่วยตาม$_groupBy'),
+                          _buildSectionTitle('จำนวนผู้ป่วยตามแผนก'),
                           const SizedBox(height: 16),
-                          _buildChart(departmentCounts),
+                          _buildChart(stats.departmentCounts),
                           const SizedBox(height: 24),
-                          _buildSectionTitle('รายละเอียดตาม$_groupBy'),
+                          _buildSectionTitle('รายละเอียดตามแผนก'),
                           const SizedBox(height: 16),
-                          _buildDetailList(departmentCounts, totalCount),
+                          _buildDetailList(stats.departmentCounts, stats.totalCount),
                         ],
                       ),
                     ),
@@ -79,7 +118,6 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
     );
   }
 
-  // ⭐️ [IMPROVED] ปรับปรุง SliverAppBar ให้สวยงามและมีมิติมากขึ้น
   Widget _buildSliverAppBar() {
     const Color accentColor = Color(0xFF0D47A1);
 
@@ -87,8 +125,8 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
       expandedHeight: 130.0,
       pinned: true,
       elevation: 2,
-      backgroundColor: Colors.white, // เปลี่ยนสีพื้นหลังตอนหดเป็นสีขาว
-      foregroundColor: accentColor, // เปลี่ยนสีไอคอนย้อนกลับ
+      backgroundColor: Colors.white,
+      foregroundColor: accentColor,
       flexibleSpace: FlexibleSpaceBar(
         centerTitle: true,
         titlePadding: const EdgeInsets.only(bottom: 16),
@@ -129,17 +167,6 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
     );
   }
 
-  // ฟังก์ชันเดิม ไม่เปลี่ยนแปลง
-  Map<String, int> _getCounts(List<Patient> patients, String type) {
-    final Map<String, int> counts = {};
-    for (var patient in patients) {
-      final key = type == 'department' ? patient.department : patient.location;
-      counts[key] = (counts[key] ?? 0) + 1;
-    }
-    return counts;
-  }
-
-  // ⭐️ [IMPROVED] ปรับปรุง Layout ของ StatCards
    Widget _buildStatCards(int total, int npoCount) {
     return IntrinsicHeight(
       child: Row(
@@ -169,7 +196,6 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
     );
   }
   
-  // ⭐️ [NEW] สร้าง Widget Card ใหม่ที่ดูโปรขึ้น
   Widget _buildInfoCard(String title, String count, IconData icon, Color color,
       {int? totalCount, int? currentCount}) {
     double percentage = 0;
@@ -233,8 +259,8 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
     );
   }
 
-  // ⭐️ [IMPROVED] ปรับปรุงดีไซน์ของ Container ที่ครอบ Chart
   Widget _buildChart(Map<String, int> data) {
+    if (data.isEmpty) return const SizedBox.shrink();
     final sortedEntries = data.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
     return Container(
@@ -312,8 +338,8 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
     );
   }
 
-  // ⭐️ [IMPROVED] ปรับปรุงดีไซน์ของรายการรายละเอียด
   Widget _buildDetailList(Map<String, int> data, int totalCount) {
+    if (data.isEmpty) return const SizedBox.shrink();
     final sortedEntries = data.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
     return Container(

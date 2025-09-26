@@ -1,3 +1,4 @@
+// lib/screens/patient_list_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -17,68 +18,52 @@ class _PatientListScreenState extends State<PatientListScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   final PatientService _patientService = PatientService();
+  final Debouncer _debouncer = Debouncer(milliseconds: 500);
 
   String _selectedBuilding = 'ทุกตึก';
   String _selectedDepartment = 'ทุกแผนก';
-  List<Patient> _allPatients = [];
-  List<Patient> _filteredPatients = [];
-  bool _isLoading = true;
-  String? _errorMessage;
+  String _searchQuery = '';
 
   final List<String> _buildings = [ 'ทุกตึก', 'ตึก A', 'ตึก B', 'ตึก C', 'ตึก D', 'ตึก E' ];
   final List<String> _departments = [ 'ทุกแผนก', 'แผนกผู้ป่วยนอก (OPD)', 'แผนกผู้ป่วยใน (IPD)', 'แผนกฉุกเฉิน (ER)', 'แผนกผ่าตัด (OR)', 'แผนกห้องปฏิบัติการ', 'แผนกรังสีและภาพวินิจฉัย', 'แผนกกายภาพบำบัด', 'แผนกสูตินรีเวช', 'แผนกกุมารเวช', 'แผนกอายุรกรรม', 'แผนกศัลยกรรม' ];
-
-  late AnimationController _animationController;
+  
+  late Stream<List<Patient>> _patientsStream;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    _fetchPatients();
-    _searchController.addListener(_filterPatients);
+    _searchController.addListener(() {
+      _debouncer.run(() {
+        if (mounted) {
+          setState(() {
+            _searchQuery = _searchController.text;
+            _updateStream();
+          });
+        }
+      });
+    });
+    _updateStream();
+  }
+  
+  void _updateStream() {
+    setState(() {
+      _patientsStream = _patientService.getPatients(
+        building: _selectedBuilding,
+        department: _selectedDepartment,
+        searchQuery: _searchQuery,
+      );
+    });
   }
 
   @override
   void dispose() {
-    _searchController.removeListener(_filterPatients);
     _searchController.dispose();
-    _animationController.dispose();
+    _debouncer.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchPatients() async {
-    try {
-      final patients = await _patientService.getPatients().first;
-      setState(() {
-        _allPatients = patients;
-        _isLoading = false;
-        _filterPatients();
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'เกิดข้อผิดพลาดในการโหลดข้อมูล: $e';
-        _isLoading = false;
-      });
-    }
-  }
-
-  void _filterPatients() {
-    final query = _searchController.text.toLowerCase();
-    setState(() {
-      _filteredPatients = _allPatients.where((patient) {
-        final matchesSearch = patient.name.toLowerCase().contains(query) || patient.hn.toLowerCase().contains(query);
-        final matchesBuilding = _selectedBuilding == 'ทุกตึก' || patient.building == _selectedBuilding;
-        final matchesDepartment = _selectedDepartment == 'ทุกแผนก' || patient.department == _selectedDepartment;
-        return matchesSearch && matchesBuilding && matchesDepartment;
-      }).toList();
-    });
-  }
-
-  Future<bool?> _showDeleteConfirmation(String patientId, String patientName) {
-     return showDialog<bool>(
+  Future<void> _deletePatient(String patientId, String patientName) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
@@ -99,11 +84,7 @@ class _PatientListScreenState extends State<PatientListScreen>
               child: Text("ยกเลิก", style: GoogleFonts.kanit(color: Colors.grey.shade700)),
             ),
             ElevatedButton(
-              onPressed: () async {
-                await _patientService.deletePatient(patientId);
-                // _fetchPatients(); // Removed to prevent double call
-                if (mounted) Navigator.of(context).pop(true);
-              },
+              onPressed: () => Navigator.of(context).pop(true),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red.shade700,
                 foregroundColor: Colors.white,
@@ -115,6 +96,18 @@ class _PatientListScreenState extends State<PatientListScreen>
         );
       },
     );
+
+    if (confirmed == true) {
+      await _patientService.deletePatient(patientId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('ลบผู้ป่วย "$patientName" สำเร็จ', style: GoogleFonts.kanit()),
+            backgroundColor: Colors.green,
+          )
+        );
+      }
+    }
   }
 
   @override
@@ -122,42 +115,44 @@ class _PatientListScreenState extends State<PatientListScreen>
     return Scaffold(
       backgroundColor: Colors.transparent,
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.of(context)
-              .push(
-                MaterialPageRoute(
-                  builder: (context) => const AddEditPatientScreen(),
-                ),
-              )
-              .then((value) {
-                if (value == true) {
-                  _fetchPatients();
-                }
-              });
+        onPressed: () async {
+          final result = await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const AddEditPatientScreen(),
+            ),
+          );
+          if (result == true && mounted) {
+            // The stream will automatically update, no need to call _fetchPatients
+          }
         },
         backgroundColor: const Color(0xFF0D47A1),
         child: const Icon(Icons.add, color: Colors.white),
       ),
-      body: CustomScrollView(
-        slivers: [
-          _buildSliverAppBar(), // ใช้ AppBar ที่ปรับปรุงแล้ว
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: _buildFilterSection(), // ใช้ Filter ที่ปรับปรุงแล้ว
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            sliver: _buildPatientList(),
-          ),
-        ],
+      body: StreamBuilder<List<Patient>>(
+        stream: _patientsStream,
+        builder: (context, snapshot) {
+          final patients = snapshot.data ?? [];
+          return CustomScrollView(
+            slivers: [
+              _buildSliverAppBar(patients.length),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: _buildFilterSection(),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                sliver: _buildPatientList(snapshot),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  // ⭐️ [IMPROVED] ปรับปรุง SliverAppBar ใหม่ทั้งหมด
-  Widget _buildSliverAppBar() {
+  Widget _buildSliverAppBar(int patientCount) {
     const Color accentColor = Color(0xFF0D47A1);
 
     return SliverAppBar(
@@ -211,7 +206,7 @@ class _PatientListScreenState extends State<PatientListScreen>
                         ),
                       ),
                        Text(
-                        'ทั้งหมด ${_filteredPatients.length} คน',
+                        'ทั้งหมด $patientCount คน',
                         style: GoogleFonts.kanit(
                           fontSize: 16,
                           color: accentColor.withOpacity(0.8),
@@ -234,7 +229,6 @@ class _PatientListScreenState extends State<PatientListScreen>
     );
   }
 
-  // ⭐️ [IMPROVED] ปรับปรุงดีไซน์ Search Bar
   Widget _buildSearchBar() {
     return Container(
       decoration: BoxDecoration(
@@ -258,7 +252,9 @@ class _PatientListScreenState extends State<PatientListScreen>
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear, color: Colors.grey),
-                  onPressed: () => _searchController.clear(),
+                  onPressed: () {
+                    _searchController.clear();
+                  },
                 )
               : null,
           border: InputBorder.none,
@@ -268,7 +264,6 @@ class _PatientListScreenState extends State<PatientListScreen>
     );
   }
 
-  // ⭐️ [IMPROVED] ปรับปรุงดีไซน์ Filter
   Widget _buildFilterSection() {
     return Row(
       children: [
@@ -276,7 +271,7 @@ class _PatientListScreenState extends State<PatientListScreen>
           child: _buildDropdown(_selectedBuilding, _buildings, (val) {
             setState(() {
               _selectedBuilding = val!;
-              _filterPatients();
+              _updateStream();
             });
           }, 'ตึก'),
         ),
@@ -285,7 +280,7 @@ class _PatientListScreenState extends State<PatientListScreen>
           child: _buildDropdown(_selectedDepartment, _departments, (val) {
             setState(() {
               _selectedDepartment = val!;
-              _filterPatients();
+              _updateStream();
             });
           }, 'แผนก'),
         ),
@@ -293,7 +288,6 @@ class _PatientListScreenState extends State<PatientListScreen>
     );
   }
   
-  // ⭐️ [NEW] Helper widget for Dropdown to reduce code duplication
   Widget _buildDropdown(String value, List<String> items, ValueChanged<String?> onChanged, String label) {
     return DropdownButtonFormField<String>(
       value: value,
@@ -327,14 +321,15 @@ class _PatientListScreenState extends State<PatientListScreen>
     );
   }
 
-  Widget _buildPatientList() {
-    if (_isLoading) {
+  Widget _buildPatientList(AsyncSnapshot<List<Patient>> snapshot) {
+    if (snapshot.connectionState == ConnectionState.waiting && snapshot.data == null) {
       return const SliverFillRemaining(child: Center(child: CircularProgressIndicator()));
     }
-    if (_errorMessage != null) {
-      return SliverFillRemaining(child: Center(child: Text(_errorMessage!, style: GoogleFonts.kanit(color: Colors.red))));
+    if (snapshot.hasError) {
+      return SliverFillRemaining(child: Center(child: Text('เกิดข้อผิดพลาด: ${snapshot.error}', style: GoogleFonts.kanit(color: Colors.red))));
     }
-    if (_filteredPatients.isEmpty) {
+    final patients = snapshot.data ?? [];
+    if (patients.isEmpty) {
       return SliverFillRemaining(
         child: Center(
           child: Column(
@@ -342,7 +337,7 @@ class _PatientListScreenState extends State<PatientListScreen>
             children: [
               Icon(Icons.person_search, size: 80, color: Colors.grey.shade400),
               const SizedBox(height: 16),
-              Text('ไม่พบข้อมูลผู้ป่วยที่ตรงกัน', style: GoogleFonts.kanit(fontSize: 18, color: Colors.grey.shade600)),
+              Text('ไม่พบข้อมูลผู้ป่วย', style: GoogleFonts.kanit(fontSize: 18, color: Colors.grey.shade600)),
             ],
           ),
         ),
@@ -351,7 +346,7 @@ class _PatientListScreenState extends State<PatientListScreen>
     return AnimationLimiter(
       child: SliverList(
         delegate: SliverChildBuilderDelegate((context, index) {
-          final patient = _filteredPatients[index];
+          final patient = patients[index];
           return AnimationConfiguration.staggeredList(
             position: index,
             duration: const Duration(milliseconds: 500),
@@ -362,12 +357,11 @@ class _PatientListScreenState extends State<PatientListScreen>
               ),
             ),
           );
-        }, childCount: _filteredPatients.length),
+        }, childCount: patients.length),
       ),
     );
   }
 
-  // ⭐️ [IMPROVED] ปรับปรุง Patient Card ใหม่ทั้งหมด
   Widget _buildPatientCard(Patient patient) {
     const accentColor = Color(0xFF0D47A1);
 
@@ -379,12 +373,9 @@ class _PatientListScreenState extends State<PatientListScreen>
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () async {
-          final result = await Navigator.of(context).push(
+          await Navigator.of(context).push(
             MaterialPageRoute(builder: (context) => AddEditPatientScreen(patient: patient)),
           );
-          if (result == true) {
-            _fetchPatients();
-          }
         },
         child: IntrinsicHeight(
           child: Row(
@@ -427,12 +418,12 @@ class _PatientListScreenState extends State<PatientListScreen>
                       const SizedBox(height: 12),
                       const Divider(height: 1),
                       const SizedBox(height: 12),
-                      _buildPatientDetail(Icons.apartment_rounded, patient.building ?? 'N/A'),
+                      _buildPatientDetail(Icons.apartment_rounded, patient.building),
                       const SizedBox(height: 8),
                       _buildPatientDetail(Icons.local_hospital_rounded, patient.department),
-                       if(patient.doctor != null && patient.doctor!.isNotEmpty) ...[
+                       if(patient.doctor.isNotEmpty) ...[
                         const SizedBox(height: 8),
-                        _buildPatientDetail(Icons.medical_services_rounded, patient.doctor!),
+                        _buildPatientDetail(Icons.medical_services_rounded, patient.doctor),
                       ]
                     ],
                   ),
@@ -440,12 +431,7 @@ class _PatientListScreenState extends State<PatientListScreen>
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
-                onPressed: () async {
-                  final confirmed = await _showDeleteConfirmation(patient.id!, patient.name);
-                  if (confirmed == true) {
-                    _fetchPatients();
-                  }
-                },
+                onPressed: () => _deletePatient(patient.id!, patient.name),
               ),
             ],
           ),
@@ -468,5 +454,24 @@ class _PatientListScreenState extends State<PatientListScreen>
         ),
       ],
     );
+  }
+}
+
+
+class Debouncer {
+  final int milliseconds;
+  Timer? _timer;
+
+  Debouncer({required this.milliseconds});
+
+  run(VoidCallback action) {
+    if (_timer != null) {
+      _timer!.cancel();
+    }
+    _timer = Timer(Duration(milliseconds: milliseconds), action);
+  }
+
+  void dispose() {
+    _timer?.cancel();
   }
 }

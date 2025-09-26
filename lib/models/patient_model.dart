@@ -1,3 +1,4 @@
+// lib/models/patient_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Patient {
@@ -25,18 +26,8 @@ class Patient {
     this.medicationTime,
   });
 
-  // แก้ไข getter ให้ทำงานได้จริง
-  String get building {
-    // ดึงตึกจาก location เช่น "ตึก A" -> "ตึก A"
-    if (location.contains('ตึก')) {
-      return location;
-    }
-    return location; // fallback
-  }
-
-  String get doctor {
-    return doctorName; // return doctorName แทน null
-  }
+  String get building => location;
+  String get doctor => doctorName;
 
   factory Patient.fromJson(Map<String, dynamic> json, String id) {
     return Patient(
