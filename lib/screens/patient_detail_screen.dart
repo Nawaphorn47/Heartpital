@@ -1,7 +1,6 @@
 // lib/screens/patient_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import '../models/patient_model.dart';
 import 'add_edit_patient_screen.dart';
 
@@ -92,12 +91,6 @@ class PatientDetailScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            _buildInfoRow(
-              icon: Icons.local_hospital_outlined,
-              title: 'แพทย์เจ้าของไข้',
-              value: patient.doctor,
-            ),
-            const Divider(height: 24),
             _buildInfoRow(
               icon: Icons.apartment_outlined,
               title: 'ตึก',

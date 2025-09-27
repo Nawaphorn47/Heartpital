@@ -30,15 +30,15 @@ class _PatientListScreenState extends State<PatientListScreen>
   String _selectedDepartment = 'ทุกแผนก';
   String _searchQuery = '';
 
-  final List<String> _buildings = [ 'ทุกตึก', 'ตึก A', 'ตึก B', 'ตึก C', 'ตึก D', 'ตึก E' ];
+  final List<String> _buildings = [ 'ทุกตึก', 'A', 'B', 'C', 'D', 'E' ];
   final List<String> _departments = [ 'ทุกแผนก', 'แผนกผู้ป่วยนอก (OPD)', 'แผนกผู้ป่วยใน (IPD)', 'แผนกฉุกเฉิน (ER)', 'แผนกผ่าตัด (OR)', 'แผนกห้องปฏิบัติการ', 'แผนกรังสีและภาพวินิจฉัย', 'แผนกกายภาพบำบัด', 'แผนกสูตินรีเวช', 'แผนกกุมารเวช', 'แผนกอายุรกรรม', 'แผนกศัลยกรรม', 'แผนกเภสัชกรรม' ];
   
-  late Stream<List<Patient>> _patientsStream;
+  Stream<List<Patient>>? _patientsStream;
 
   @override
   void initState() {
     super.initState();
-    _loadCurrentUser();
+    _loadCurrentUserAndSetupStream();
     _searchController.addListener(() {
       _debouncer.run(() {
         if (mounted) {
@@ -49,22 +49,29 @@ class _PatientListScreenState extends State<PatientListScreen>
         }
       });
     });
-    _updateStream();
   }
 
-  Future<void> _loadCurrentUser() async {
+  Future<void> _loadCurrentUserAndSetupStream() async {
     final firebaseUser = auth.FirebaseAuth.instance.currentUser;
     if (firebaseUser != null) {
       final user = await _userService.getUserById(firebaseUser.uid);
       if (mounted) {
         setState(() {
           _currentUser = user;
+          _updateStream(); // Call updateStream after user is loaded
         });
       }
+    } else {
+       if (mounted) {
+        setState(() {
+          _patientsStream = Stream.value([]);
+        });
+       }
     }
   }
 
   void _updateStream() {
+    if (_currentUser == null) return; // Don't query if user is not loaded
     setState(() {
       _patientsStream = _patientService.getPatients(
         building: _selectedBuilding,
@@ -135,16 +142,21 @@ class _PatientListScreenState extends State<PatientListScreen>
       backgroundColor: Colors.transparent,
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          await Navigator.of(context).push(
+          final result = await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => const AddEditPatientScreen(),
             ),
           );
+          if (result == true) {
+            _updateStream();
+          }
         },
         backgroundColor: const Color(0xFF0D47A1),
         child: const Icon(Icons.add, color: Colors.white),
       ),
-      body: StreamBuilder<List<Patient>>(
+      body: _patientsStream == null 
+        ? const Center(child: CircularProgressIndicator())
+        : StreamBuilder<List<Patient>>(
         stream: _patientsStream,
         builder: (context, snapshot) {
           final patients = snapshot.data ?? [];
@@ -434,10 +446,6 @@ class _PatientListScreenState extends State<PatientListScreen>
                       _buildPatientDetail(Icons.apartment_rounded, patient.building),
                       const SizedBox(height: 8),
                       _buildPatientDetail(Icons.local_hospital_rounded, patient.department),
-                       if(patient.doctor.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        _buildPatientDetail(Icons.medical_services_rounded, patient.doctor),
-                      ],
                     ],
                   ),
                 ),

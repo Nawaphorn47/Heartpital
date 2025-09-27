@@ -1,14 +1,13 @@
 // lib/screens/add_edit_patient_screen.dart
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth; // เพิ่ม import
 import '../models/patient_model.dart';
 import '../models/notification_model.dart';
 import '../services/patient_service.dart';
 import '../services/notification_service.dart';
 import '../services/notification_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../services/user_service.dart';
-import '../models/user_model.dart';
 
 class AddEditPatientScreen extends StatefulWidget {
   final Patient? patient;
@@ -22,40 +21,35 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
   final _formKey = GlobalKey<FormState>();
   final PatientService _patientService = PatientService();
   final NotificationService _notificationService = NotificationService();
-  final UserService _userService = UserService();
 
   late TextEditingController _nameController;
   late TextEditingController _notificationDetailController;
-  
+
   String? _selectedBuilding;
   String? _selectedDepartment;
-  
+
   TimeOfDay? _appointmentTime;
-  
-  // [MODIFIED] เปลี่ยนเป็น int? สำหรับเก็บนาที
-  int? _selectedReminderMinutes; 
+
+  int? _selectedReminderMinutes;
   String? _reminderType;
-  
+
   final List<String> _notificationTypes = [
     'เตรียมอุปกรณ์', 'เตรียมเอกสาร', 'ตรวจสอบข้อมูล', 'การให้ยาและหัตถการ',
     'การตรวจร่างกายและประเมินอาการ', 'การดูแลช่วยเหลือผู้ป่วยในชีวิตประจำวัน',
     'การประสานงานกับทีมแพทย์', 'การเฝ้าระวังและป้องกัน', 'อื่นๆ'
   ];
-  
+
   bool _isNPO = false;
   bool _isLoading = false;
-  
-  List<User> _doctors = [];
-  String? _selectedDoctorName;
-  
+
   final List<String> _buildings = ['A', 'B', 'C', 'D', 'E'];
-  
+
   final List<String> _departments = [
     'แผนกผู้ป่วยนอก (OPD)','แผนกผู้ป่วยใน (IPD)','แผนกฉุกเฉิน (ER)','แผนกผ่าตัด (OR)',
     'แผนกห้องปฏิบัติการ','แผนกรังสีและภาพวินิจฉัย','แผนกกายภาพบำบัด','แผนกเภสัชกรรม',
     'แผนกโภชนาการ','แผนกบริหาร/ธุรการ'
   ];
-  
+
   bool get isEditing => widget.patient != null;
 
   @override
@@ -63,7 +57,7 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
     super.initState();
     _nameController = TextEditingController(text: widget.patient?.name);
     _notificationDetailController = TextEditingController();
-    
+
     if (widget.patient?.medicationTime != null) {
       final dt = widget.patient!.medicationTime!.toDate();
       _appointmentTime = TimeOfDay.fromDateTime(dt);
@@ -81,12 +75,9 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
     } else {
       _selectedBuilding = _buildings.first;
     }
-    
+
     _selectedDepartment = widget.patient?.department ?? _departments.first;
     _isNPO = widget.patient?.isNPO ?? false;
-    _selectedDoctorName = widget.patient?.doctorName;
-    
-    _fetchDoctors();
   }
 
   @override
@@ -94,17 +85,6 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
     _nameController.dispose();
     _notificationDetailController.dispose();
     super.dispose();
-  }
-
-  Future<void> _fetchDoctors() async {
-    final doctorsStream = _userService.getUsers();
-    final doctorsList = await doctorsStream.first;
-    setState(() {
-      _doctors = doctorsList;
-      if (!isEditing && _doctors.isNotEmpty) {
-        _selectedDoctorName = _doctors.first.name;
-      }
-    });
   }
 
   Future<String> _generateHN() async {
@@ -123,9 +103,18 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
   Future<void> _savePatient() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
+      
+      final currentUser = auth.FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('กรุณาเข้าสู่ระบบก่อน', style: GoogleFonts.kanit()), backgroundColor: Colors.red),
+          );
+          setState(() => _isLoading = false);
+        }
+        return;
+      }
 
-      // [MODIFIED] แก้ไข Bug เวลานัดหมายไม่ถูกบันทึกตอนแก้ไข
-      // และเพิ่ม Logic การคำนวณเวลาแจ้งเตือน
       try {
         String hn = isEditing ? widget.patient!.hn : await _generateHN();
 
@@ -136,11 +125,14 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
         }
 
         final patient = Patient(
-          id: widget.patient?.id, name: _nameController.text.trim(),
-          hn: hn, location: 'ตึก $_selectedBuilding',
-          doctorName: _selectedDoctorName!, department: _selectedDepartment!,
-          isNPO: _isNPO, 
+          id: widget.patient?.id,
+          name: _nameController.text.trim(),
+          hn: hn,
+          location: 'ตึก $_selectedBuilding',
+          department: _selectedDepartment!,
+          isNPO: _isNPO,
           medicationTime: appointmentDateTime != null ? Timestamp.fromDate(appointmentDateTime) : null,
+          createdBy: currentUser.uid, // เพิ่ม createdBy
         );
 
         String patientId;
@@ -152,8 +144,7 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
           patientId = docRef.id;
         }
 
-        // สร้างการแจ้งเตือนเมื่อ: มีเวลานัด, มีการเลือกเวลาก่อนนัด, และเป็นเคสใหม่
-        if (appointmentDateTime != null && _selectedReminderMinutes != null && !isEditing) {
+        if (appointmentDateTime != null && _selectedReminderMinutes != null) {
           await _createAndScheduleNotification(patientId, patient.name, appointmentDateTime);
         }
 
@@ -164,7 +155,11 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
           Navigator.pop(context, true);
         }
       } catch (e) {
-        // ... (error handling เหมือนเดิม)
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('เกิดข้อผิดพลาด: $e', style: GoogleFonts.kanit()), backgroundColor: Colors.red),
+          );
+        }
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
@@ -173,7 +168,6 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
 
   Future<void> _createAndScheduleNotification(String patientId, String patientName, DateTime appointmentDateTime) async {
     
-    // คำนวณเวลาที่จะให้แจ้งเตือนเด้ง
     final reminderDateTime = appointmentDateTime.subtract(Duration(minutes: _selectedReminderMinutes!));
     final details = _notificationDetailController.text.trim().isNotEmpty ? _notificationDetailController.text.trim() : 'ได้เวลาเตรียมตัว';
     
@@ -181,8 +175,8 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
       patientId: patientId,
       details: '${_reminderType!}: $details',
       type: 'care',
-      timestamp: Timestamp.fromDate(reminderDateTime), // เวลาที่จะแจ้งเตือน
-      appointmentTime: Timestamp.fromDate(appointmentDateTime), // เวลาจริง
+      timestamp: Timestamp.fromDate(reminderDateTime),
+      appointmentTime: Timestamp.fromDate(appointmentDateTime),
       isUrgent: false,
     );
     await _notificationService.addNotification(notification);
@@ -216,7 +210,6 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
                 _buildInfoCard('เลข HN จะถูกสร้างอัตโนมัติ', Icons.info_outline),
               _buildBuildingDropdown(),
               _buildDepartmentDropdown(),
-              _buildDoctorDropdown(),
               _buildNPOCheckbox(),
               
               const SizedBox(height: 16),
@@ -229,13 +222,13 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
                 }
               ),
 
-              if (!isEditing && _appointmentTime != null) ...[
+              if (_appointmentTime != null) ...[
                 const SizedBox(height: 16),
                 _buildSectionTitle('แจ้งเตือนล่วงหน้า (ไม่บังคับ)'),
                 _buildReminderTimeDropdown(),
               ],
 
-              if (!isEditing && _selectedReminderMinutes != null) ...[
+              if (_selectedReminderMinutes != null) ...[
                 _buildNotificationTypeDropdown(),
                 if (_reminderType != null) ...[
                   _buildTextField('รายละเอียดการแจ้งเตือน', Icons.description_outlined, _notificationDetailController, maxLines: 3),
@@ -261,8 +254,7 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
     );
   }
 
-  // ... (โค้ด buildTextField, buildReadOnlyField, buildInfoCard, etc. เหมือนเดิม)
-    Widget _buildTextField(String label, IconData icon, TextEditingController controller, {int maxLines = 1}) {
+  Widget _buildTextField(String label, IconData icon, TextEditingController controller, {int maxLines = 1}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: TextFormField(
@@ -273,7 +265,6 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
           filled: true, fillColor: Colors.white,
         ),
         validator: (v) {
-          // ทำให้ detail ไม่จำเป็นต้องกรอกก็ได้
           if (controller == _notificationDetailController) return null;
           return v == null || v.trim().isEmpty ? 'กรุณากรอกข้อมูล' : null;
         }
@@ -335,21 +326,7 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
       ),
     );
   }
-  Widget _buildDoctorDropdown() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: DropdownButtonFormField<String>(
-        value: _selectedDoctorName,
-        decoration: InputDecoration(labelText: 'แพทย์เจ้าของไข้', prefixIcon: const Icon(Icons.local_hospital_outlined),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-          filled: true, fillColor: Colors.white,
-        ),
-        items: _doctors.map((doctor) => DropdownMenuItem(value: doctor.name, child: Text('${doctor.name} (${doctor.position})', style: GoogleFonts.kanit()))).toList(),
-        onChanged: (val) => setState(() => _selectedDoctorName = val),
-        validator: (v) => v == null ? 'กรุณาเลือกแพทย์' : null,
-      ),
-    );
-  }
+  
   Widget _buildNPOCheckbox() {
     return Container(
       margin: const EdgeInsets.only(bottom: 16.0),
@@ -366,7 +343,6 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
     return Text(title, style: GoogleFonts.kanit(fontSize: 18, fontWeight: FontWeight.bold, color: const Color.fromARGB(255, 32, 124, 191)));
   }
   
-  // [NEW] Dropdown สำหรับเลือกเวลแจ้งเตือนล่วงหน้า
   Widget _buildReminderTimeDropdown() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),

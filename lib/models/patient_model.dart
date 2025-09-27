@@ -6,11 +6,11 @@ class Patient {
   String name;
   String hn;
   String location;
-  String doctorName;
   String department;
   String status;
   bool isNPO;
   Timestamp? medicationTime;
+  final String createdBy; // เพิ่มบรรทัดนี้
 
   static const CollectionName = 'patients';
 
@@ -19,15 +19,14 @@ class Patient {
     required this.name,
     required this.hn,
     required this.location,
-    required this.doctorName,
     required this.department,
     this.status = 'ปกติ',
     this.isNPO = false,
     this.medicationTime,
+    required this.createdBy, // เพิ่มบรรทัดนี้
   });
 
   String get building => location;
-  String get doctor => doctorName;
 
   factory Patient.fromJson(Map<String, dynamic> json, String id) {
     return Patient(
@@ -35,11 +34,11 @@ class Patient {
       name: json['name'] as String,
       hn: json['hn'] as String,
       location: json['location'] as String,
-      doctorName: json['doctorName'] as String,
       department: json['department'] as String,
       status: json['status'] as String? ?? 'ปกติ',
       isNPO: json['isNPO'] as bool? ?? false,
       medicationTime: json['medicationTime'] as Timestamp?,
+      createdBy: json['createdBy'] as String, // เพิ่มบรรทัดนี้
     );
   }
 
@@ -48,11 +47,11 @@ class Patient {
       'name': name,
       'hn': hn,
       'location': location,
-      'doctorName': doctorName,
       'department': department,
       'status': status,
       'isNPO': isNPO,
       'medicationTime': medicationTime,
+      'createdBy': createdBy, // เพิ่มบรรทัดนี้
     };
   }
 }
