@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/patient_model.dart';
 import '../services/patient_service.dart';
 import 'add_edit_patient_screen.dart';
+import 'patient_detail_screen.dart'; // [ADD] เพิ่ม import สำหรับหน้า Detail
 import 'dart:async';
 
 class PatientListScreen extends StatefulWidget {
@@ -372,9 +373,12 @@ class _PatientListScreenState extends State<PatientListScreen>
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => AddEditPatientScreen(patient: patient)),
+        // [MODIFIED] แก้ไขส่วนนี้
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => PatientDetailScreen(patient: patient),
+            ),
           );
         },
         child: IntrinsicHeight(

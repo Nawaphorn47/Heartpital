@@ -1,167 +1,172 @@
 // lib/screens/patient_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart'; // [ADD] เพิ่ม import สำหรับจัดรูปแบบวันที่
 import '../models/patient_model.dart';
+import 'add_edit_patient_screen.dart';
 
-class PatientDetailScreen extends StatefulWidget {
+class PatientDetailScreen extends StatelessWidget {
   final Patient patient;
 
   const PatientDetailScreen({super.key, required this.patient});
 
   @override
-  State<PatientDetailScreen> createState() => _PatientDetailScreenState();
-}
-
-class _PatientDetailScreenState extends State<PatientDetailScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: NestedScrollView(
-        headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
-          return <Widget>[
-            SliverAppBar(
-              expandedHeight: 250.0,
-              floating: false,
-              pinned: true,
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              flexibleSpace: FlexibleSpaceBar(
-                centerTitle: true,
-                title: Text(
-                  widget.patient.name,
-                  style: GoogleFonts.kanit(fontWeight: FontWeight.bold, color: Colors.white),
+      backgroundColor: const Color(0xFFF0F4F8),
+      appBar: AppBar(
+        title: Text('รายละเอียดผู้ป่วย', style: GoogleFonts.kanit()),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF0D47A1),
+        elevation: 2,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => AddEditPatientScreen(patient: patient),
                 ),
-                background: Stack(
-                  fit: StackFit.expand,
-                  children: <Widget>[
-                    Hero(
-                      tag: 'avatar-${widget.patient.id}',
-                      child: Container(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        child: Icon(Icons.person, size: 100, color: Theme.of(context).colorScheme.primary),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary,
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(24),
-                            topRight: Radius.circular(24),
-                          ),
-                        ),
-                        child: Text(
-                          'HN: ${widget.patient.hn}',
-                          style: GoogleFonts.kanit(fontSize: 16, color: Colors.white.withOpacity(0.8)),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverPersistentHeader(
-              delegate: _SliverAppBarDelegate(
-                TabBar(
-                  controller: _tabController,
-                  labelStyle: GoogleFonts.kanit(fontWeight: FontWeight.bold),
-                  unselectedLabelStyle: GoogleFonts.kanit(),
-                  indicatorColor: Theme.of(context).colorScheme.primary,
-                  tabs: const [
-                    Tab(text: 'ข้อมูลส่วนตัว'),
-                    Tab(text: 'ตารางยา'),
-                    Tab(text: 'ประวัติ'),
-                  ],
-                ),
-              ),
-              pinned: true,
-            ),
-          ];
-        },
-        body: TabBarView(
-          controller: _tabController,
+              );
+            },
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
           children: [
-            _buildProfileTab(widget.patient),
-            _buildMedicationTab(),
-            _buildHistoryTab(),
+            _buildProfileHeader(),
+            const SizedBox(height: 24),
+            _buildInfoCard(context), // [MODIFIED] ส่ง context ไปเพื่อใช้ format เวลา
           ],
         ),
       ),
     );
   }
 
-  Widget _buildProfileTab(Patient patient) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildInfoTile(Icons.medical_services_outlined, 'แพทย์เจ้าของไข้', 'นพ. ${patient.doctorName}'),
-          _buildInfoTile(Icons.location_on_outlined, 'ตึก', patient.location),
-          _buildInfoTile(Icons.business_center_outlined, 'แผนก', patient.department),
-        ],
-      ),
+  Widget _buildProfileHeader() {
+    return Column(
+      children: [
+        CircleAvatar(
+          radius: 50,
+          backgroundColor: const Color(0xFF0D47A1).withOpacity(0.1),
+          child: const Icon(
+            Icons.person_outline,
+            size: 60,
+            color: Color(0xFF0D47A1),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          patient.name,
+          style: GoogleFonts.kanit(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        Text(
+          'HN: ${patient.hn}',
+          style: GoogleFonts.kanit(
+            fontSize: 16,
+            color: Colors.grey.shade600,
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildMedicationTab() {
-    return const Center(child: Text('กำลังจะเชื่อมต่อกับหน้าตารางยา...', style: TextStyle(fontFamily: 'Kanit')));
-  }
+  Widget _buildInfoCard(BuildContext context) { // [MODIFIED] รับ context
+    // [ADD] จัดการการแสดงผลเวลา
+    String appointmentTimeDisplay = "ยังไม่ได้ตั้งค่า";
+    if (patient.medicationTime != null) {
+      final dateTime = patient.medicationTime!.toDate();
+      // ใช้ MaterialLocalizations.of(context) เพื่อให้ format เวลาตรงตาม local ของเครื่อง
+      appointmentTimeDisplay = MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(dateTime));
+    }
 
-  Widget _buildHistoryTab() {
-    return const Center(child: Text('กำลังจะสร้างประวัติการรักษา...', style: TextStyle(fontFamily: 'Kanit')));
-  }
-
-  Widget _buildInfoTile(IconData icon, String title, String subtitle) {
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: ListTile(
-        leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
-        title: Text(title, style: GoogleFonts.kanit(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle, style: GoogleFonts.kanit()),
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            _buildInfoRow(
+              icon: Icons.local_hospital_outlined,
+              title: 'แพทย์เจ้าของไข้',
+              value: patient.doctor,
+            ),
+            const Divider(height: 24),
+            _buildInfoRow(
+              icon: Icons.apartment_outlined,
+              title: 'ตึก',
+              value: patient.building,
+            ),
+            const Divider(height: 24),
+            _buildInfoRow(
+              icon: Icons.business_center_outlined,
+              title: 'แผนก',
+              value: patient.department,
+            ),
+            const Divider(height: 24),
+            // [NEW] เพิ่มการแสดงผลเวลานัดหมาย
+            _buildInfoRow(
+              icon: Icons.access_time_filled_rounded,
+              title: 'เวลานัดหมาย/หัตถการ',
+              value: appointmentTimeDisplay,
+              valueColor: patient.medicationTime != null ? const Color(0xFF0D47A1) : Colors.grey,
+            ),
+            const Divider(height: 24),
+            _buildInfoRow(
+              icon: patient.isNPO ? Icons.no_food_outlined : Icons.food_bank_outlined,
+              title: 'สถานะ NPO',
+              value: patient.isNPO ? 'งดน้ำและอาหาร' : 'ปกติ',
+              valueColor: patient.isNPO ? Colors.orange.shade800 : Colors.green.shade800,
+            ),
+          ],
+        ),
       ),
     );
   }
-}
 
-class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  _SliverAppBarDelegate(this._tabBar);
-
-  final TabBar _tabBar;
-
-  @override
-  double get minExtent => _tabBar.preferredSize.height;
-  @override
-  double get maxExtent => _tabBar.preferredSize.height;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: _tabBar,
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String title,
+    required String value,
+    Color? valueColor,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: Colors.grey.shade500, size: 20),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.kanit(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: GoogleFonts.kanit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: valueColor ?? Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
-  }
-
-  @override
-  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
-    return false;
   }
 }
