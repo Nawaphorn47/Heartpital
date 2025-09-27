@@ -1,18 +1,21 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
-//import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '/screens/theme_provider.dart';
-
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_screen_scaffold.dart';
+import 'services/notification_helper.dart'; // [ADD] เพิ่ม import
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  
+  // [ADD] เรียกใช้งานการตั้งค่าเริ่มต้นของ Notification ที่นี่
+  await NotificationHelper.initialize(); 
 
   runApp(
     ChangeNotifierProvider(
@@ -32,9 +35,6 @@ class MyApp extends StatelessWidget {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'Patient Management App',
-
-         
-
           initialRoute: '/',
           routes: {
             '/': (context) => const LoginScreen(),

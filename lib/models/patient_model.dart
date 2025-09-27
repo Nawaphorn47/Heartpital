@@ -11,6 +11,10 @@ class Patient {
   String status;
   bool isNPO;
   Timestamp? medicationTime;
+  
+  // [NEW] เพิ่ม 2 field นี้เข้าไป
+  final String? assignedNurseId;
+  final String? assignedNurseName;
 
   static const CollectionName = 'patients';
 
@@ -24,6 +28,8 @@ class Patient {
     this.status = 'ปกติ',
     this.isNPO = false,
     this.medicationTime,
+    this.assignedNurseId, // [NEW]
+    this.assignedNurseName, // [NEW]
   });
 
   String get building => location;
@@ -40,6 +46,9 @@ class Patient {
       status: json['status'] as String? ?? 'ปกติ',
       isNPO: json['isNPO'] as bool? ?? false,
       medicationTime: json['medicationTime'] as Timestamp?,
+      // [NEW] ดึงข้อมูลใหม่จาก Firestore
+      assignedNurseId: json['assignedNurseId'] as String?,
+      assignedNurseName: json['assignedNurseName'] as String?,
     );
   }
 
@@ -53,6 +62,9 @@ class Patient {
       'status': status,
       'isNPO': isNPO,
       'medicationTime': medicationTime,
+      // [NEW] เพิ่มข้อมูลใหม่ตอนบันทึก
+      'assignedNurseId': assignedNurseId,
+      'assignedNurseName': assignedNurseName,
     };
   }
 }

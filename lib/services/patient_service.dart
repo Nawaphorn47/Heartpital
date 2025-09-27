@@ -5,6 +5,7 @@ import '../models/patient_model.dart';
 class PatientService {
   final CollectionReference _collection = FirebaseFirestore.instance.collection(Patient.CollectionName);
 
+  // ... (โค้ดส่วนอื่นเหมือนเดิม)
   Stream<List<Patient>> getPatients({String? building, String? department, String? searchQuery}) {
     Query query = _collection;
 
@@ -14,10 +15,7 @@ class PatientService {
     if (department != null && department != 'ทุกแผนก') {
       query = query.where('department', isEqualTo: department);
     }
-    // การค้นหาจะทำใน patient_list_screen หลังจากได้ข้อมูลที่กรองแล้ว
-    // Firestore ไม่รองรับการค้นหาแบบ full-text search ในหลายๆ field พร้อมกันโดยตรง
-    // หากต้องการประสิทธิภาพการค้นหาที่ดีกว่านี้ อาจต้องใช้บริการเสริมเช่น Algolia หรือ Elasticsearch
-
+    
     return query.snapshots().map((snapshot) {
       var patients = snapshot.docs.map((doc) => Patient.fromJson(doc.data() as Map<String, dynamic>, doc.id)).toList();
       
@@ -46,5 +44,13 @@ class PatientService {
 
   Future<void> deletePatient(String patientId) async {
     await _collection.doc(patientId).delete();
+  }
+
+  // [NEW] ฟังก์ชันสำหรับให้พยาบาลรับเคส
+  Future<void> assignNurseToPatient(String patientId, String nurseId, String nurseName) async {
+    await _collection.doc(patientId).update({
+      'assignedNurseId': nurseId,
+      'assignedNurseName': nurseName,
+    });
   }
 }

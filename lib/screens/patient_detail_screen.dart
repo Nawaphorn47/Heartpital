@@ -1,7 +1,7 @@
 // lib/screens/patient_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart'; // [ADD] เพิ่ม import สำหรับจัดรูปแบบวันที่
+import 'package:intl/intl.dart';
 import '../models/patient_model.dart';
 import 'add_edit_patient_screen.dart';
 
@@ -38,7 +38,7 @@ class PatientDetailScreen extends StatelessWidget {
           children: [
             _buildProfileHeader(),
             const SizedBox(height: 24),
-            _buildInfoCard(context), // [MODIFIED] ส่ง context ไปเพื่อใช้ format เวลา
+            _buildInfoCard(context),
           ],
         ),
       ),
@@ -77,12 +77,10 @@ class PatientDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoCard(BuildContext context) { // [MODIFIED] รับ context
-    // [ADD] จัดการการแสดงผลเวลา
+  Widget _buildInfoCard(BuildContext context) {
     String appointmentTimeDisplay = "ยังไม่ได้ตั้งค่า";
     if (patient.medicationTime != null) {
       final dateTime = patient.medicationTime!.toDate();
-      // ใช้ MaterialLocalizations.of(context) เพื่อให้ format เวลาตรงตาม local ของเครื่อง
       appointmentTimeDisplay = MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(dateTime));
     }
 
@@ -100,6 +98,14 @@ class PatientDetailScreen extends StatelessWidget {
               value: patient.doctor,
             ),
             const Divider(height: 24),
+            // [NEW] เพิ่มการแสดงผลผู้ดูแล (พยาบาล)
+            _buildInfoRow(
+              icon: Icons.person_search_outlined,
+              title: 'ผู้ดูแลเคส',
+              value: patient.assignedNurseName ?? 'ยังไม่มีผู้รับเคส',
+              valueColor: patient.assignedNurseName != null ? Colors.green.shade800 : Colors.grey,
+            ),
+            const Divider(height: 24),
             _buildInfoRow(
               icon: Icons.apartment_outlined,
               title: 'ตึก',
@@ -112,7 +118,6 @@ class PatientDetailScreen extends StatelessWidget {
               value: patient.department,
             ),
             const Divider(height: 24),
-            // [NEW] เพิ่มการแสดงผลเวลานัดหมาย
             _buildInfoRow(
               icon: Icons.access_time_filled_rounded,
               title: 'เวลานัดหมาย/หัตถการ',

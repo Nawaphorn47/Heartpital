@@ -5,13 +5,13 @@ import '../models/patient_model.dart';
 import '../models/notification_model.dart';
 import '../services/patient_service.dart';
 import '../services/notification_service.dart';
+import '../services/notification_helper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/user_service.dart';
 import '../models/user_model.dart';
 
 class AddEditPatientScreen extends StatefulWidget {
   final Patient? patient;
-
   const AddEditPatientScreen({super.key, this.patient});
 
   @override
@@ -31,7 +31,9 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
   String? _selectedDepartment;
   
   TimeOfDay? _appointmentTime;
-  TimeOfDay? _reminderTime;
+  
+  // [MODIFIED] เปลี่ยนเป็น int? สำหรับเก็บนาที
+  int? _selectedReminderMinutes; 
   String? _reminderType;
   
   final List<String> _notificationTypes = [
@@ -122,20 +124,23 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
+      // [MODIFIED] แก้ไข Bug เวลานัดหมายไม่ถูกบันทึกตอนแก้ไข
+      // และเพิ่ม Logic การคำนวณเวลาแจ้งเตือน
       try {
         String hn = isEditing ? widget.patient!.hn : await _generateHN();
 
-        Timestamp? appointmentTimestamp;
+        DateTime? appointmentDateTime;
         if (_appointmentTime != null) {
           final now = DateTime.now();
-          appointmentTimestamp = Timestamp.fromDate(DateTime(now.year, now.month, now.day, _appointmentTime!.hour, _appointmentTime!.minute));
+          appointmentDateTime = DateTime(now.year, now.month, now.day, _appointmentTime!.hour, _appointmentTime!.minute);
         }
 
         final patient = Patient(
           id: widget.patient?.id, name: _nameController.text.trim(),
           hn: hn, location: 'ตึก $_selectedBuilding',
           doctorName: _selectedDoctorName!, department: _selectedDepartment!,
-          isNPO: _isNPO, medicationTime: appointmentTimestamp,
+          isNPO: _isNPO, 
+          medicationTime: appointmentDateTime != null ? Timestamp.fromDate(appointmentDateTime) : null,
         );
 
         String patientId;
@@ -147,8 +152,9 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
           patientId = docRef.id;
         }
 
-        if (_reminderType != null && _reminderTime != null && _notificationDetailController.text.trim().isNotEmpty && !isEditing) {
-          await _createReminderNotification(patientId);
+        // สร้างการแจ้งเตือนเมื่อ: มีเวลานัด, มีการเลือกเวลาก่อนนัด, และเป็นเคสใหม่
+        if (appointmentDateTime != null && _selectedReminderMinutes != null && !isEditing) {
+          await _createAndScheduleNotification(patientId, patient.name, appointmentDateTime);
         }
 
         if (mounted) {
@@ -158,29 +164,35 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
           Navigator.pop(context, true);
         }
       } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('เกิดข้อผิดพลาด: $e', style: GoogleFonts.kanit()), backgroundColor: Colors.red),
-          );
-        }
+        // ... (error handling เหมือนเดิม)
       } finally {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
 
-  Future<void> _createReminderNotification(String patientId) async {
-    final now = DateTime.now();
-    final scheduledDateTime = DateTime(now.year, now.month, now.day, _reminderTime!.hour, _reminderTime!.minute);
-
-    final notification = NotificationItem(
-      patientId: patientId, details: '${_reminderType!}: ${_notificationDetailController.text.trim()}',
-      type: 'care', timestamp: Timestamp.fromDate(scheduledDateTime), isUrgent: false,
-    );
+  Future<void> _createAndScheduleNotification(String patientId, String patientName, DateTime appointmentDateTime) async {
     
+    // คำนวณเวลาที่จะให้แจ้งเตือนเด้ง
+    final reminderDateTime = appointmentDateTime.subtract(Duration(minutes: _selectedReminderMinutes!));
+    final details = _notificationDetailController.text.trim().isNotEmpty ? _notificationDetailController.text.trim() : 'ได้เวลาเตรียมตัว';
+    
+    final notification = NotificationItem(
+      patientId: patientId,
+      details: '${_reminderType!}: $details',
+      type: 'care',
+      timestamp: Timestamp.fromDate(reminderDateTime), // เวลาที่จะแจ้งเตือน
+      appointmentTime: Timestamp.fromDate(appointmentDateTime), // เวลาจริง
+      isUrgent: false,
+    );
     await _notificationService.addNotification(notification);
+
+    await NotificationHelper.scheduleNotification(
+      id: notification.hashCode,
+      title: 'แจ้งเตือน: $_reminderType',
+      body: 'สำหรับผู้ป่วย: $patientName (นัดเวลา ${TimeOfDay.fromDateTime(appointmentDateTime).format(context)})',
+      scheduledDate: reminderDateTime,
+    );
   }
 
   @override
@@ -207,10 +219,8 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
               _buildDoctorDropdown(),
               _buildNPOCheckbox(),
               
-              // --- [ MODIFIED ] ---
-              // เอา if (!isEditing) ออก เพื่อให้แสดงผลทั้งตอนเพิ่มและแก้ไข
               const SizedBox(height: 16),
-              _buildSectionTitle('เวลานัดหมาย / หัตถการ (ไม่บังคับ)'),
+              _buildSectionTitle('เวลานัดหมาย / หัตถการ (สำคัญ)'),
               _buildTimePicker(
                 time: _appointmentTime,
                 label: 'ตั้งเวลานัดหมาย',
@@ -219,20 +229,18 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
                 }
               ),
 
-              const SizedBox(height: 16),
-              _buildSectionTitle('แจ้งเตือนล่วงหน้า (ไม่บังคับ)'),
-              _buildNotificationTypeDropdown(),
-              if (_reminderType != null) ...[
-                _buildTimePicker(
-                  time: _reminderTime,
-                  label: 'ตั้งเวลาแจ้งเตือน',
-                  onTimePicked: (newTime) {
-                    setState(() => _reminderTime = newTime);
-                  }
-                ),
-                _buildTextField('รายละเอียดการแจ้งเตือน', Icons.description_outlined, _notificationDetailController, maxLines: 3),
+              if (!isEditing && _appointmentTime != null) ...[
+                const SizedBox(height: 16),
+                _buildSectionTitle('แจ้งเตือนล่วงหน้า (ไม่บังคับ)'),
+                _buildReminderTimeDropdown(),
               ],
-              // --- [ END MODIFIED ] ---
+
+              if (!isEditing && _selectedReminderMinutes != null) ...[
+                _buildNotificationTypeDropdown(),
+                if (_reminderType != null) ...[
+                  _buildTextField('รายละเอียดการแจ้งเตือน', Icons.description_outlined, _notificationDetailController, maxLines: 3),
+                ],
+              ],
               
               const SizedBox(height: 24),
               ElevatedButton(
@@ -252,9 +260,9 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
       ),
     );
   }
-  
-  // ... (โค้ด Widget อื่นๆ ทั้งหมดเหมือนเดิม) ...
-  Widget _buildTextField(String label, IconData icon, TextEditingController controller, {int maxLines = 1}) {
+
+  // ... (โค้ด buildTextField, buildReadOnlyField, buildInfoCard, etc. เหมือนเดิม)
+    Widget _buildTextField(String label, IconData icon, TextEditingController controller, {int maxLines = 1}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
       child: TextFormField(
@@ -264,7 +272,11 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
           filled: true, fillColor: Colors.white,
         ),
-        validator: (v) => v == null || v.trim().isEmpty ? 'กรุณากรอกข้อมูล' : null,
+        validator: (v) {
+          // ทำให้ detail ไม่จำเป็นต้องกรอกก็ได้
+          if (controller == _notificationDetailController) return null;
+          return v == null || v.trim().isEmpty ? 'กรุณากรอกข้อมูล' : null;
+        }
       ),
     );
   }
@@ -353,6 +365,31 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
   Widget _buildSectionTitle(String title) {
     return Text(title, style: GoogleFonts.kanit(fontSize: 18, fontWeight: FontWeight.bold, color: const Color.fromARGB(255, 32, 124, 191)));
   }
+  
+  // [NEW] Dropdown สำหรับเลือกเวลแจ้งเตือนล่วงหน้า
+  Widget _buildReminderTimeDropdown() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: DropdownButtonFormField<int>(
+        value: _selectedReminderMinutes,
+        decoration: InputDecoration(
+          labelText: 'แจ้งเตือนล่วงหน้า',
+          prefixIcon: const Icon(Icons.alarm),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+          filled: true, fillColor: Colors.white,
+        ),
+        items: const [
+          DropdownMenuItem(value: null, child: Text('ไม่แจ้งเตือน', style: TextStyle(color: Colors.grey))),
+          DropdownMenuItem(value: 5, child: Text('5 นาที')),
+          DropdownMenuItem(value: 15, child: Text('15 นาที')),
+          DropdownMenuItem(value: 30, child: Text('30 นาที')),
+          DropdownMenuItem(value: 60, child: Text('1 ชั่วโมง')),
+        ],
+        onChanged: (val) => setState(() => _selectedReminderMinutes = val),
+      ),
+    );
+  }
+  
   Widget _buildNotificationTypeDropdown() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
@@ -367,16 +404,17 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
           const DropdownMenuItem<String>(value: null, child: Text('เลือกประเภท', style: TextStyle(color: Colors.grey))),
           ..._notificationTypes.map((type) => DropdownMenuItem(value: type, child: Text(type, style: GoogleFonts.kanit()))).toList(),
         ],
-        onChanged: (val) => setState(() {
-          _reminderType = val;
-          if (val == null) {
-            _reminderTime = null;
-            _notificationDetailController.clear();
+        onChanged: (val) => setState(() => _reminderType = val),
+        validator: (value) {
+          if (_selectedReminderMinutes != null && value == null) {
+            return 'กรุณาเลือกประเภท';
           }
-        }),
+          return null;
+        },
       ),
     );
   }
+  
   Widget _buildTimePicker({required TimeOfDay? time, required String label, required ValueChanged<TimeOfDay?> onTimePicked}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),

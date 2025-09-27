@@ -2,10 +2,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 import '../models/patient_model.dart';
+import '../models/user_model.dart' as app_user;
 import '../services/patient_service.dart';
+import '../services/user_service.dart';
 import 'add_edit_patient_screen.dart';
-import 'patient_detail_screen.dart'; // [ADD] เพิ่ม import สำหรับหน้า Detail
+import 'patient_detail_screen.dart';
 import 'dart:async';
 
 class PatientListScreen extends StatefulWidget {
@@ -19,20 +22,25 @@ class _PatientListScreenState extends State<PatientListScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   final PatientService _patientService = PatientService();
+  final UserService _userService = UserService();
   final Debouncer _debouncer = Debouncer(milliseconds: 500);
 
+  app_user.User? _currentUser;
   String _selectedBuilding = 'ทุกตึก';
   String _selectedDepartment = 'ทุกแผนก';
   String _searchQuery = '';
 
   final List<String> _buildings = [ 'ทุกตึก', 'ตึก A', 'ตึก B', 'ตึก C', 'ตึก D', 'ตึก E' ];
-  final List<String> _departments = [ 'ทุกแผนก', 'แผนกผู้ป่วยนอก (OPD)', 'แผนกผู้ป่วยใน (IPD)', 'แผนกฉุกเฉิน (ER)', 'แผนกผ่าตัด (OR)', 'แผนกห้องปฏิบัติการ', 'แผนกรังสีและภาพวินิจฉัย', 'แผนกกายภาพบำบัด', 'แผนกสูตินรีเวช', 'แผนกกุมารเวช', 'แผนกอายุรกรรม', 'แผนกศัลยกรรม' ];
+  // [MODIFIED] เพิ่มแผนกเภสัชกรรม
+  final List<String> _departments = [ 'ทุกแผนก', 'แผนกผู้ป่วยนอก (OPD)', 'แผนกผู้ป่วยใน (IPD)', 'แผนกฉุกเฉิน (ER)', 'แผนกผ่าตัด (OR)', 'แผนกห้องปฏิบัติการ', 'แผนกรังสีและภาพวินิจฉัย', 'แผนกกายภาพบำบัด', 'แผนกสูตินรีเวช', 'แผนกกุมารเวช', 'แผนกอายุรกรรม', 'แผนกศัลยกรรม', 'แผนกเภสัชกรรม' ];
   
   late Stream<List<Patient>> _patientsStream;
 
+  // ... (โค้ดส่วนที่เหลือของไฟล์นี้เหมือนเดิมทั้งหมด)
   @override
   void initState() {
     super.initState();
+    _loadCurrentUser();
     _searchController.addListener(() {
       _debouncer.run(() {
         if (mounted) {
@@ -45,7 +53,19 @@ class _PatientListScreenState extends State<PatientListScreen>
     });
     _updateStream();
   }
-  
+
+  Future<void> _loadCurrentUser() async {
+    final firebaseUser = auth.FirebaseAuth.instance.currentUser;
+    if (firebaseUser != null) {
+      final user = await _userService.getUserById(firebaseUser.uid);
+      if (mounted) {
+        setState(() {
+          _currentUser = user;
+        });
+      }
+    }
+  }
+
   void _updateStream() {
     setState(() {
       _patientsStream = _patientService.getPatients(
@@ -117,14 +137,11 @@ class _PatientListScreenState extends State<PatientListScreen>
       backgroundColor: Colors.transparent,
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          final result = await Navigator.of(context).push(
+          await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => const AddEditPatientScreen(),
             ),
           );
-          if (result == true && mounted) {
-            // The stream will automatically update, no need to call _fetchPatients
-          }
         },
         backgroundColor: const Color(0xFF0D47A1),
         child: const Icon(Icons.add, color: Colors.white),
@@ -364,7 +381,10 @@ class _PatientListScreenState extends State<PatientListScreen>
   }
 
   Widget _buildPatientCard(Patient patient) {
-    const accentColor = Color(0xFF0D47A1);
+    final isAssigned = patient.assignedNurseId != null;
+    final isAssignedToMe = isAssigned && patient.assignedNurseId == _currentUser?.id;
+
+    final Color accentColor = isAssignedToMe ? Colors.green.shade700 : (isAssigned ? Colors.grey.shade600 : Color(0xFF0D47A1));
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -373,7 +393,6 @@ class _PatientListScreenState extends State<PatientListScreen>
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        // [MODIFIED] แก้ไขส่วนนี้
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -387,7 +406,7 @@ class _PatientListScreenState extends State<PatientListScreen>
               Container(
                 width: 6,
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.8),
+                  color: accentColor,
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(16),
                     bottomLeft: Radius.circular(16),
@@ -413,30 +432,48 @@ class _PatientListScreenState extends State<PatientListScreen>
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            'HN: ${patient.hn}',
-                            style: GoogleFonts.kanit(fontSize: 12, color: accentColor, fontWeight: FontWeight.w500),
-                          ),
+                          Text('HN: ${patient.hn}', style: GoogleFonts.kanit(fontSize: 12, color: accentColor, fontWeight: FontWeight.w500)),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      const Divider(height: 1),
-                      const SizedBox(height: 12),
+                      const Divider(height: 24, thickness: 0.5),
                       _buildPatientDetail(Icons.apartment_rounded, patient.building),
                       const SizedBox(height: 8),
                       _buildPatientDetail(Icons.local_hospital_rounded, patient.department),
                        if(patient.doctor.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         _buildPatientDetail(Icons.medical_services_rounded, patient.doctor),
+                      ],
+                      if (isAssigned) ...[
+                        const SizedBox(height: 8),
+                        _buildPatientDetail(
+                          isAssignedToMe ? Icons.check_circle : Icons.person,
+                          isAssignedToMe ? 'คุณรับเคสนี้อยู่' : 'รับเคสโดย: ${patient.assignedNurseName}',
+                        ),
                       ]
                     ],
                   ),
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
-                onPressed: () => _deletePatient(patient.id!, patient.name),
-              ),
+              if (!isAssigned)
+                IconButton(
+                  icon: const Icon(Icons.playlist_add_check_rounded, color: Color(0xFF0D47A1)),
+                  tooltip: 'รับเคส',
+                  onPressed: () async {
+                    if (_currentUser != null) {
+                      await _patientService.assignNurseToPatient(patient.id!, _currentUser!.id!, _currentUser!.name);
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('รับเคสผู้ป่วย ${patient.name} สำเร็จ', style: GoogleFonts.kanit()),
+                        backgroundColor: Colors.green,
+                      ));
+                    }
+                  },
+                )
+              else
+                IconButton(
+                  icon: Icon(Icons.delete_outline_rounded, color: isAssignedToMe ? Colors.redAccent : Colors.grey),
+                  tooltip: 'ลบผู้ป่วย',
+                  onPressed: isAssignedToMe ? () => _deletePatient(patient.id!, patient.name) : null,
+                ),
             ],
           ),
         ),
@@ -460,7 +497,6 @@ class _PatientListScreenState extends State<PatientListScreen>
     );
   }
 }
-
 
 class Debouncer {
   final int milliseconds;
