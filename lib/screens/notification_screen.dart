@@ -1,5 +1,4 @@
 // lib/screens/notification_screen.dart
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,10 +6,8 @@ import 'package:rxdart/rxdart.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import '../models/notification_model.dart';
 import '../models/patient_model.dart';
-import '../models/user_model.dart' as app_user;
 import '../services/notification_service.dart';
 import '../services/patient_service.dart';
-import '../services/user_service.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -22,7 +19,6 @@ class NotificationScreen extends StatefulWidget {
 class _NotificationScreenState extends State<NotificationScreen> {
   final NotificationService _notificationService = NotificationService();
   final PatientService _patientService = PatientService();
-  final UserService _userService = UserService();
   Stream<List<Map<String, dynamic>>>? _combinedStream;
   Timer? _timer;
 
@@ -35,42 +31,41 @@ class _NotificationScreenState extends State<NotificationScreen> {
     });
   }
 
-  Future<void> _initializeStream() async {
+  void _initializeStream() {
     final currentUser = auth.FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
       setState(() => _combinedStream = Stream.value([]));
       return;
     }
 
-    // ดึงข้อมูลผู้ใช้ปัจจุบันเพื่อหาแผนก
-    final app_user.User? currentUserData = await _userService.getUserById(currentUser.uid);
-    if (!mounted || currentUserData == null) {
-      setState(() => _combinedStream = Stream.value([]));
-      return;
-    }
-
-    final userDepartment = currentUserData.position;
-
     setState(() {
-      _combinedStream = _patientService.getPatients().switchMap((allPatients) {
-        // กรองผู้ป่วยตามแผนกของพยาบาลที่ล็อกอิน
-        final departmentPatientIds = allPatients
-            .where((p) => p.department == userDepartment)
-            .map((p) => p.id!)
-            .toList();
+      // getPatients() จะดึงข้อมูลผู้ป่วยเฉพาะของ user ที่ login อยู่แล้ว (จากไฟล์ patient_service)
+      _combinedStream = _patientService.getPatients().switchMap((myPatients) {
+        
+        // ดึง ID ของผู้ป่วยทั้งหมดที่ user คนนี้สร้าง
+        final myPatientIds = myPatients.map((p) => p.id!).toList();
 
-        if (departmentPatientIds.isEmpty) return Stream.value([]);
+        if (myPatientIds.isEmpty) {
+          return Stream.value([]);
+        }
 
-        return _notificationService.getNotifications().map((notifications) {
-          final departmentNotifications = notifications
-              .where((n) => departmentPatientIds.contains(n.patientId))
+        // ดึงการแจ้งเตือนทั้งหมด แล้วกรองเอาเฉพาะอันที่เกี่ยวกับผู้ป่วยของ user คนนี้
+        return _notificationService.getNotifications().map((allNotifications) {
+          
+          final myNotifications = allNotifications
+              .where((n) => myPatientIds.contains(n.patientId))
               .toList();
           
-          departmentNotifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-          final Map<String, Patient> patientMap = {for (var p in allPatients) p.id!: p};
-          return departmentNotifications.map((notification) {
-            return {'notification': notification, 'patient': patientMap[notification.patientId]};
-          }).toList();
+          myNotifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+          
+          final Map<String, Patient> patientMap = {for (var p in myPatients) p.id!: p};
+          
+          return myNotifications.map((notification) {
+            return {
+              'notification': notification,
+              'patient': patientMap[notification.patientId]
+            };
+          }).where((item) => item['patient'] != null).toList();
         });
       });
     });
@@ -168,7 +163,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   children: [
                     Icon(Icons.notifications_off_outlined, size: 80, color: Colors.grey.shade400),
                     const SizedBox(height: 16),
-                    Text('ยังไม่มีการแจ้งเตือนในแผนกของคุณ', style: GoogleFonts.kanit(fontSize: 18, color: Colors.grey.shade600)),
+                    Text('ยังไม่มีการแจ้งเตือน', style: GoogleFonts.kanit(fontSize: 18, color: Colors.grey.shade600)),
                   ],
                 ),
               );
@@ -214,6 +209,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
       remainingTimeStr = _formatRemainingTime(remaining);
       if (!remaining.isNegative) {
         remainingTimeColor = remaining.inMinutes < 15 ? Colors.red.shade700 : Colors.orange.shade800;
+      } else {
+        remainingTimeColor = Colors.green.shade700;
       }
     }
 

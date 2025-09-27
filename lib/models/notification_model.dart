@@ -7,10 +7,8 @@ class NotificationItem {
   final String details;
   final bool isUrgent;
   final String type;
-  final Timestamp timestamp; // นี่คือเวลาที่จะให้แจ้งเตือนเด้ง (Reminder Time)
-  
-  // [NEW] เพิ่ม field นี้สำหรับเก็บเวลานัดหมายจริง
-  final Timestamp? appointmentTime; 
+  final Timestamp timestamp; // เวลาที่จะให้แจ้งเตือนเด้ง (Reminder Time)
+  final Timestamp? appointmentTime; // เวลานัดหมายจริง
 
   static const CollectionName = 'notifications';
 
@@ -21,7 +19,7 @@ class NotificationItem {
     this.isUrgent = false,
     required this.type,
     required this.timestamp,
-    this.appointmentTime, // [NEW]
+    this.appointmentTime,
   });
 
   factory NotificationItem.fromJson(Map<String, dynamic> json, String id) {
@@ -32,7 +30,7 @@ class NotificationItem {
       isUrgent: json['isUrgent'] as bool? ?? false,
       type: json['type'] as String,
       timestamp: json['timestamp'] as Timestamp,
-      appointmentTime: json['appointmentTime'] as Timestamp?, // [NEW]
+      appointmentTime: json['appointmentTime'] as Timestamp?,
     );
   }
 
@@ -43,7 +41,7 @@ class NotificationItem {
       'isUrgent': isUrgent,
       'type': type,
       'timestamp': timestamp,
-      'appointmentTime': appointmentTime, // [NEW]
+      'appointmentTime': appointmentTime,
     };
   }
 }
