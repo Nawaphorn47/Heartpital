@@ -31,12 +31,10 @@ class _PatientListScreenState extends State<PatientListScreen>
   String _searchQuery = '';
 
   final List<String> _buildings = [ 'ทุกตึก', 'ตึก A', 'ตึก B', 'ตึก C', 'ตึก D', 'ตึก E' ];
-  // [MODIFIED] เพิ่มแผนกเภสัชกรรม
   final List<String> _departments = [ 'ทุกแผนก', 'แผนกผู้ป่วยนอก (OPD)', 'แผนกผู้ป่วยใน (IPD)', 'แผนกฉุกเฉิน (ER)', 'แผนกผ่าตัด (OR)', 'แผนกห้องปฏิบัติการ', 'แผนกรังสีและภาพวินิจฉัย', 'แผนกกายภาพบำบัด', 'แผนกสูตินรีเวช', 'แผนกกุมารเวช', 'แผนกอายุรกรรม', 'แผนกศัลยกรรม', 'แผนกเภสัชกรรม' ];
   
   late Stream<List<Patient>> _patientsStream;
 
-  // ... (โค้ดส่วนที่เหลือของไฟล์นี้เหมือนเดิมทั้งหมด)
   @override
   void initState() {
     super.initState();
@@ -381,10 +379,7 @@ class _PatientListScreenState extends State<PatientListScreen>
   }
 
   Widget _buildPatientCard(Patient patient) {
-    final isAssigned = patient.assignedNurseId != null;
-    final isAssignedToMe = isAssigned && patient.assignedNurseId == _currentUser?.id;
-
-    final Color accentColor = isAssignedToMe ? Colors.green.shade700 : (isAssigned ? Colors.grey.shade600 : Color(0xFF0D47A1));
+    const Color accentColor = Color(0xFF0D47A1);
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -405,9 +400,9 @@ class _PatientListScreenState extends State<PatientListScreen>
             children: [
               Container(
                 width: 6,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: accentColor,
-                  borderRadius: const BorderRadius.only(
+                  borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(16),
                     bottomLeft: Radius.circular(16),
                   ),
@@ -443,37 +438,15 @@ class _PatientListScreenState extends State<PatientListScreen>
                         const SizedBox(height: 8),
                         _buildPatientDetail(Icons.medical_services_rounded, patient.doctor),
                       ],
-                      if (isAssigned) ...[
-                        const SizedBox(height: 8),
-                        _buildPatientDetail(
-                          isAssignedToMe ? Icons.check_circle : Icons.person,
-                          isAssignedToMe ? 'คุณรับเคสนี้อยู่' : 'รับเคสโดย: ${patient.assignedNurseName}',
-                        ),
-                      ]
                     ],
                   ),
                 ),
               ),
-              if (!isAssigned)
-                IconButton(
-                  icon: const Icon(Icons.playlist_add_check_rounded, color: Color(0xFF0D47A1)),
-                  tooltip: 'รับเคส',
-                  onPressed: () async {
-                    if (_currentUser != null) {
-                      await _patientService.assignNurseToPatient(patient.id!, _currentUser!.id!, _currentUser!.name);
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('รับเคสผู้ป่วย ${patient.name} สำเร็จ', style: GoogleFonts.kanit()),
-                        backgroundColor: Colors.green,
-                      ));
-                    }
-                  },
-                )
-              else
-                IconButton(
-                  icon: Icon(Icons.delete_outline_rounded, color: isAssignedToMe ? Colors.redAccent : Colors.grey),
-                  tooltip: 'ลบผู้ป่วย',
-                  onPressed: isAssignedToMe ? () => _deletePatient(patient.id!, patient.name) : null,
-                ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                tooltip: 'ลบผู้ป่วย',
+                onPressed: () => _deletePatient(patient.id!, patient.name),
+              ),
             ],
           ),
         ),

@@ -98,14 +98,6 @@ class PatientDetailScreen extends StatelessWidget {
               value: patient.doctor,
             ),
             const Divider(height: 24),
-            // [NEW] เพิ่มการแสดงผลผู้ดูแล (พยาบาล)
-            _buildInfoRow(
-              icon: Icons.person_search_outlined,
-              title: 'ผู้ดูแลเคส',
-              value: patient.assignedNurseName ?? 'ยังไม่มีผู้รับเคส',
-              valueColor: patient.assignedNurseName != null ? Colors.green.shade800 : Colors.grey,
-            ),
-            const Divider(height: 24),
             _buildInfoRow(
               icon: Icons.apartment_outlined,
               title: 'ตึก',

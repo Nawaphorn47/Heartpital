@@ -1,14 +1,16 @@
 // lib/screens/notification_screen.dart
 
-import 'dart:async'; // [ADD]
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import '../models/notification_model.dart';
 import '../models/patient_model.dart';
+import '../models/user_model.dart' as app_user;
 import '../services/notification_service.dart';
 import '../services/patient_service.dart';
+import '../services/user_service.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -20,54 +22,67 @@ class NotificationScreen extends StatefulWidget {
 class _NotificationScreenState extends State<NotificationScreen> {
   final NotificationService _notificationService = NotificationService();
   final PatientService _patientService = PatientService();
-  late Stream<List<Map<String, dynamic>>> _combinedStream;
-  Timer? _timer; // [ADD] Timer สำหรับ countdown
+  final UserService _userService = UserService();
+  Stream<List<Map<String, dynamic>>>? _combinedStream;
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    final currentUser = auth.FirebaseAuth.instance.currentUser;
-
-    if (currentUser == null) {
-      _combinedStream = Stream.value([]);
-      return;
-    }
-    
-    _combinedStream = _patientService.getPatients().switchMap((allPatients) {
-      final myPatientIds = allPatients
-          .where((p) => p.assignedNurseId == currentUser.uid)
-          .map((p) => p.id!)
-          .toList();
-
-      if (myPatientIds.isEmpty) return Stream.value([]);
-
-      return _notificationService.getNotifications().map((notifications) {
-        final myNotifications = notifications
-            .where((n) => myPatientIds.contains(n.patientId))
-            .toList();
-        
-        myNotifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-        final Map<String, Patient> patientMap = {for (var p in allPatients) p.id!: p};
-        return myNotifications.map((notification) {
-          return {'notification': notification, 'patient': patientMap[notification.patientId]};
-        }).toList();
-      });
-    });
-
-    // [ADD] เริ่มการทำงานของ Timer
+    _initializeStream();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) setState(() {});
+    });
+  }
+
+  Future<void> _initializeStream() async {
+    final currentUser = auth.FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      setState(() => _combinedStream = Stream.value([]));
+      return;
+    }
+
+    // ดึงข้อมูลผู้ใช้ปัจจุบันเพื่อหาแผนก
+    final app_user.User? currentUserData = await _userService.getUserById(currentUser.uid);
+    if (!mounted || currentUserData == null) {
+      setState(() => _combinedStream = Stream.value([]));
+      return;
+    }
+
+    final userDepartment = currentUserData.position;
+
+    setState(() {
+      _combinedStream = _patientService.getPatients().switchMap((allPatients) {
+        // กรองผู้ป่วยตามแผนกของพยาบาลที่ล็อกอิน
+        final departmentPatientIds = allPatients
+            .where((p) => p.department == userDepartment)
+            .map((p) => p.id!)
+            .toList();
+
+        if (departmentPatientIds.isEmpty) return Stream.value([]);
+
+        return _notificationService.getNotifications().map((notifications) {
+          final departmentNotifications = notifications
+              .where((n) => departmentPatientIds.contains(n.patientId))
+              .toList();
+          
+          departmentNotifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+          final Map<String, Patient> patientMap = {for (var p in allPatients) p.id!: p};
+          return departmentNotifications.map((notification) {
+            return {'notification': notification, 'patient': patientMap[notification.patientId]};
+          }).toList();
+        });
+      });
     });
   }
   
   @override
   void dispose() {
-    _timer?.cancel(); // [ADD] อย่าลืมปิด Timer
+    _timer?.cancel();
     super.dispose();
   }
 
-  // ... (โค้ด _timeAgo และ _completeTask เหมือนเดิม)
-    String _timeAgo(DateTime date) {
+  String _timeAgo(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
     if (difference.inDays > 0) return '${difference.inDays} วันที่แล้ว';
@@ -75,7 +90,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
     if (difference.inMinutes > 0) return '${difference.inMinutes} นาทีที่แล้ว';
     return 'เมื่อสักครู่';
   }
-    Future<void> _completeTask(NotificationItem notification, Patient patient) async {
+
+  Future<void> _completeTask(NotificationItem notification, Patient patient) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -110,7 +126,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
   }
 
-  // [NEW] ฟังก์ชันสำหรับจัดรูปแบบเวลาที่เหลือ
   String _formatRemainingTime(Duration remaining) {
     if (remaining.isNegative) return "ถึงเวลาแล้ว";
     
@@ -122,7 +137,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return "$hours:$minutes:$seconds";
   }
 
-  // ... (build method เหมือนเดิม)
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -140,7 +154,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
             colors: [const Color(0xFFBAE2FF).withOpacity(0.5), const Color(0xFF81D4FA).withOpacity(0.2)],
           ),
         ),
-        child: StreamBuilder<List<Map<String, dynamic>>>(
+        child: _combinedStream == null
+        ? const Center(child: CircularProgressIndicator())
+        : StreamBuilder<List<Map<String, dynamic>>>(
           stream: _combinedStream,
           builder: (context, snapshot) {
             if (snapshot.hasError) return Center(child: Text('เกิดข้อผิดพลาดบางอย่าง', style: GoogleFonts.kanit()));
@@ -152,7 +168,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   children: [
                     Icon(Icons.notifications_off_outlined, size: 80, color: Colors.grey.shade400),
                     const SizedBox(height: 16),
-                    Text('ยังไม่มีการแจ้งเตือนสำหรับเคสของคุณ', style: GoogleFonts.kanit(fontSize: 18, color: Colors.grey.shade600)),
+                    Text('ยังไม่มีการแจ้งเตือนในแผนกของคุณ', style: GoogleFonts.kanit(fontSize: 18, color: Colors.grey.shade600)),
                   ],
                 ),
               );
@@ -180,9 +196,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
-
   Widget _buildNotificationCard(NotificationItem item, Patient patient) {
-    // ... (ส่วน icon, color เหมือนเดิม)
     IconData iconData; Color color;
     switch (item.type) {
       case 'medication': iconData = Icons.medical_services_rounded; color = const Color(0xFF0D47A1); break;
@@ -193,7 +207,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
       default: iconData = Icons.notifications_rounded; color = Colors.grey.shade200; break;
     }
 
-    // [MODIFIED] คำนวณเวลาที่เหลือ
     String remainingTimeStr = '';
     Color remainingTimeColor = Colors.grey;
     if (item.appointmentTime != null) {
@@ -218,7 +231,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 Icon(iconData, color: color, size: 28),
                 const SizedBox(width: 12),
                 Expanded(child: Text(item.details, style: GoogleFonts.kanit(fontWeight: FontWeight.w600, fontSize: 16, color: color))),
-                // [MODIFIED] แสดงเวลาที่เด้งแจ้งเตือน (ไม่ใช่เวลาที่เหลือ)
                 Text(_timeAgo(item.timestamp.toDate()), style: GoogleFonts.kanit(fontSize: 12, color: Colors.grey.shade600)),
               ],
             ),
@@ -226,7 +238,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
             _buildDetailRow(Icons.person_outline, 'ผู้ป่วย:', patient.name),
             _buildDetailRow(Icons.location_on_outlined, 'สถานที่:', '${patient.location}, ${patient.department}'),
             
-            // [NEW] แสดงแถบเวลาที่เหลือ
             if (item.appointmentTime != null) ...[
               const SizedBox(height: 8),
               _buildDetailRow(Icons.timer_outlined, 'เหลือเวลา:', remainingTimeStr, valueColor: remainingTimeColor),
