@@ -1,3 +1,4 @@
+// lib/models/notification_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class NotificationItem {
@@ -6,9 +7,9 @@ class NotificationItem {
   final String details;
   final bool isUrgent;
   final String type;
-  final Timestamp timestamp; // เวลาที่จะให้แจ้งเตือนเด้ง (Reminder Time)
+  final Timestamp timestamp; // นี่คือเวลาที่จะให้แจ้งเตือนเด้ง (Reminder Time)
   
-  // เพิ่ม field นี้สำหรับเก็บเวลานัดหมายจริง
+  // [NEW] เพิ่ม field นี้สำหรับเก็บเวลานัดหมายจริง
   final Timestamp? appointmentTime; 
 
   static const CollectionName = 'notifications';
@@ -20,7 +21,7 @@ class NotificationItem {
     this.isUrgent = false,
     required this.type,
     required this.timestamp,
-    this.appointmentTime,
+    this.appointmentTime, // [NEW]
   });
 
   factory NotificationItem.fromJson(Map<String, dynamic> json, String id) {
@@ -31,7 +32,7 @@ class NotificationItem {
       isUrgent: json['isUrgent'] as bool? ?? false,
       type: json['type'] as String,
       timestamp: json['timestamp'] as Timestamp,
-      appointmentTime: json['appointmentTime'] as Timestamp?,
+      appointmentTime: json['appointmentTime'] as Timestamp?, // [NEW]
     );
   }
 
@@ -42,7 +43,7 @@ class NotificationItem {
       'isUrgent': isUrgent,
       'type': type,
       'timestamp': timestamp,
-      'appointmentTime': appointmentTime,
+      'appointmentTime': appointmentTime, // [NEW]
     };
   }
 }

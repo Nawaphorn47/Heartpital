@@ -1,19 +1,13 @@
+// lib/services/patient_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../models/patient_model.dart';
 
 class PatientService {
-  // [FIX] แก้ไขการเรียกใช้ชื่อตัวแปร
-  final CollectionReference _collection = FirebaseFirestore.instance.collection(Patient.collectionName);
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final CollectionReference _collection = FirebaseFirestore.instance.collection(Patient.CollectionName);
 
+  // ... (โค้ดส่วนอื่นเหมือนเดิม)
   Stream<List<Patient>> getPatients({String? building, String? department, String? searchQuery}) {
-    final User? user = _auth.currentUser;
-    if (user == null) {
-      return Stream.value([]);
-    }
-
-    Query query = _collection.where('creatorId', isEqualTo: user.uid);
+    Query query = _collection;
 
     if (building != null && building != 'ทุกตึก') {
       query = query.where('location', isEqualTo: building);
@@ -33,18 +27,6 @@ class PatientService {
         }).toList();
       }
       
-      patients.sort((a, b) {
-        if (a.status == 'เสร็จสิ้น' && b.status != 'เสร็จสิ้น') {
-          return 1;
-        }
-        if (a.status != 'เสร็จสิ้น' && b.status == 'เสร็จสิ้น') {
-          return -1;
-        }
-        final aTime = a.medicationTime ?? Timestamp(0, 0);
-        final bTime = b.medicationTime ?? Timestamp(0, 0);
-        return bTime.compareTo(aTime);
-      });
-
       return patients;
     });
   }
@@ -60,11 +42,15 @@ class PatientService {
     await _collection.doc(patient.id).update(patient.toJson());
   }
 
-  Future<void> updatePatientStatus(String patientId, String newStatus) async {
-    await _collection.doc(patientId).update({'status': newStatus});
-  }
-
   Future<void> deletePatient(String patientId) async {
     await _collection.doc(patientId).delete();
+  }
+
+  // [NEW] ฟังก์ชันสำหรับให้พยาบาลรับเคส
+  Future<void> assignNurseToPatient(String patientId, String nurseId, String nurseName) async {
+    await _collection.doc(patientId).update({
+      'assignedNurseId': nurseId,
+      'assignedNurseName': nurseName,
+    });
   }
 }

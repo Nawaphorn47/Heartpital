@@ -1,5 +1,7 @@
+// lib/screens/patient_detail_screen.dart
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../models/patient_model.dart';
 import 'add_edit_patient_screen.dart';
 
@@ -13,23 +15,21 @@ class PatientDetailScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
       appBar: AppBar(
-        title: Text('รายละเอียดเคส', style: GoogleFonts.kanit()),
+        title: Text('รายละเอียดผู้ป่วย', style: GoogleFonts.kanit()),
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF0D47A1),
         elevation: 2,
         actions: [
-          // อนุญาตให้แก้ไขได้เฉพาะเคสที่ยังไม่เสร็จสิ้น
-          if (patient.status != 'เสร็จสิ้น')
-            IconButton(
-              icon: const Icon(Icons.edit_outlined),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => AddEditPatientScreen(patient: patient),
-                  ),
-                );
-              },
-            ),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => AddEditPatientScreen(patient: patient),
+                ),
+              );
+            },
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -93,6 +93,20 @@ class PatientDetailScreen extends StatelessWidget {
         child: Column(
           children: [
             _buildInfoRow(
+              icon: Icons.local_hospital_outlined,
+              title: 'แพทย์เจ้าของไข้',
+              value: patient.doctor,
+            ),
+            const Divider(height: 24),
+            // [NEW] เพิ่มการแสดงผลผู้ดูแล (พยาบาล)
+            _buildInfoRow(
+              icon: Icons.person_search_outlined,
+              title: 'ผู้ดูแลเคส',
+              value: patient.assignedNurseName ?? 'ยังไม่มีผู้รับเคส',
+              valueColor: patient.assignedNurseName != null ? Colors.green.shade800 : Colors.grey,
+            ),
+            const Divider(height: 24),
+            _buildInfoRow(
               icon: Icons.apartment_outlined,
               title: 'ตึก',
               value: patient.building,
@@ -116,13 +130,6 @@ class PatientDetailScreen extends StatelessWidget {
               title: 'สถานะ NPO',
               value: patient.isNPO ? 'งดน้ำและอาหาร' : 'ปกติ',
               valueColor: patient.isNPO ? Colors.orange.shade800 : Colors.green.shade800,
-            ),
-             const Divider(height: 24),
-            _buildInfoRow(
-              icon: patient.status == 'เสร็จสิ้น' ? Icons.check_circle : Icons.pending_actions,
-              title: 'สถานะเคส',
-              value: patient.status,
-              valueColor: patient.status == 'เสร็จสิ้น' ? Colors.grey : Colors.blue.shade800,
             ),
           ],
         ),

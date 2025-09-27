@@ -6,29 +6,34 @@ class Patient {
   String name;
   String hn;
   String location;
+  String doctorName;
   String department;
   String status;
   bool isNPO;
   Timestamp? medicationTime;
   
-  // เพิ่ม field นี้เพื่อระบุว่าใครเป็นคนสร้างเคสนี้
-  final String creatorId;
+  // [NEW] เพิ่ม 2 field นี้เข้าไป
+  final String? assignedNurseId;
+  final String? assignedNurseName;
 
-  static const collectionName = 'patients';
+  static const CollectionName = 'patients';
 
   Patient({
     this.id,
     required this.name,
     required this.hn,
     required this.location,
+    required this.doctorName,
     required this.department,
-    this.status = 'กำลังดำเนินการ', // เปลี่ยนค่าเริ่มต้น
+    this.status = 'ปกติ',
     this.isNPO = false,
     this.medicationTime,
-    required this.creatorId,
+    this.assignedNurseId, // [NEW]
+    this.assignedNurseName, // [NEW]
   });
 
   String get building => location;
+  String get doctor => doctorName;
 
   factory Patient.fromJson(Map<String, dynamic> json, String id) {
     return Patient(
@@ -36,11 +41,14 @@ class Patient {
       name: json['name'] as String,
       hn: json['hn'] as String,
       location: json['location'] as String,
+      doctorName: json['doctorName'] as String,
       department: json['department'] as String,
-      status: json['status'] as String? ?? 'กำลังดำเนินการ',
+      status: json['status'] as String? ?? 'ปกติ',
       isNPO: json['isNPO'] as bool? ?? false,
       medicationTime: json['medicationTime'] as Timestamp?,
-      creatorId: json['creatorId'] as String? ?? '',
+      // [NEW] ดึงข้อมูลใหม่จาก Firestore
+      assignedNurseId: json['assignedNurseId'] as String?,
+      assignedNurseName: json['assignedNurseName'] as String?,
     );
   }
 
@@ -49,11 +57,14 @@ class Patient {
       'name': name,
       'hn': hn,
       'location': location,
+      'doctorName': doctorName,
       'department': department,
       'status': status,
       'isNPO': isNPO,
       'medicationTime': medicationTime,
-      'creatorId': creatorId,
+      // [NEW] เพิ่มข้อมูลใหม่ตอนบันทึก
+      'assignedNurseId': assignedNurseId,
+      'assignedNurseName': assignedNurseName,
     };
   }
 }

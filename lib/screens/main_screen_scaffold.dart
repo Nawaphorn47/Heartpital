@@ -1,11 +1,11 @@
 // lib/screens/main_screen_scaffold.dart
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'patient_list_screen.dart';
-import 'patient_dashboard_screen.dart';
 import 'notification_screen.dart';
+import 'patient_list_screen.dart';
 import 'setting_screen.dart';
-import 'schedule_screen.dart';
+import 'patient_dashboard_screen.dart';
 
 class MainScreenScaffold extends StatefulWidget {
   const MainScreenScaffold({super.key});
@@ -17,13 +17,11 @@ class MainScreenScaffold extends StatefulWidget {
 class _MainScreenScaffoldState extends State<MainScreenScaffold> {
   int _selectedIndex = 0;
 
-  // [FIX] ลบ const ออกจากตรงนี้
-  static final List<Widget> _widgetOptions = <Widget>[
-    const PatientDashboardScreen(),
-    const PatientListScreen(),
-    const ScheduleScreen(),
-    const NotificationScreen(),
-    const SettingsScreen(),
+  static const List<Widget> _widgetOptions = <Widget>[
+    PatientListScreen(),
+    PatientDashboardScreen(),
+    NotificationScreen(),
+    SettingsScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -35,30 +33,62 @@ class _MainScreenScaffoldState extends State<MainScreenScaffold> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("assets/images/hospital2.png"),
-            fit: BoxFit.cover,
-          ),
-        ),
+        // ใช้สีเดียวกับหน้า Login
+        color: const Color(0xFFBAE2FF),
         child: _widgetOptions.elementAt(_selectedIndex),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'ภาพรวม'),
-          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'ผู้ป่วย'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'ตาราง'),
-          BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'แจ้งเตือน'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'ตั้งค่า'),
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: const Color.fromARGB(255, 12, 59, 133),
-        unselectedItemColor: Colors.grey,
-        onTap: _onItemTapped,
-        showUnselectedLabels: true,
-        selectedLabelStyle: GoogleFonts.kanit(),
-        unselectedLabelStyle: GoogleFonts.kanit(),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white, // สีขาวสำหรับ BottomNavigationBar
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              spreadRadius: 2,
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people_alt_outlined),
+              activeIcon: Icon(Icons.people_alt),
+              label: 'ผู้ป่วย',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.show_chart_outlined),
+              activeIcon: Icon(Icons.show_chart),
+              label: 'แดชบอร์ด',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.receipt_long_outlined),
+              activeIcon: Icon(Icons.receipt_long),
+              label: 'แจ้งเตือน',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.settings_outlined),
+              activeIcon: Icon(Icons.settings),
+              label: 'ตั้งค่า',
+            ),
+          ],
+          currentIndex: _selectedIndex,
+          selectedItemColor: const Color(0xFF0D47A1), // สีไอคอนเมื่อเลือก
+          unselectedItemColor: const Color(0xFF0D47A1).withOpacity(0.6), // สีไอคอนเมื่อไม่ได้เลือก
+          showUnselectedLabels: true,
+          onTap: _onItemTapped,
+          type: BottomNavigationBarType.fixed,
+          selectedLabelStyle: GoogleFonts.kanit(fontWeight: FontWeight.bold),
+          unselectedLabelStyle: GoogleFonts.kanit(),
+        ),
       ),
     );
   }

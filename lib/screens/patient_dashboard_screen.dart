@@ -387,7 +387,7 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
       ),
     );
   }
-ฆ
+
   Color _getChartColor(int index) {
     final colors = [
       const Color(0xFF0D47A1),
