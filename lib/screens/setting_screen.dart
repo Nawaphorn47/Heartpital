@@ -25,11 +25,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadUserData();
   }
 
-  // [OPTIMIZED] ปรับปรุงการดึงข้อมูลผู้ใช้
   Future<void> _loadUserData() async {
     final firebaseUser = auth.FirebaseAuth.instance.currentUser;
     if (firebaseUser != null) {
-      // ดึงข้อมูลผู้ใช้โดยตรงจาก ID ไม่ต้องดึงมาทั้งหมด
       final user = await _userService.getUserById(firebaseUser.uid);
       if (mounted) {
         setState(() {
@@ -73,15 +71,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return Scaffold(
-          backgroundColor: Colors.transparent,
+          backgroundColor: const Color.fromARGB(255, 186, 226, 255),
           appBar: AppBar(
-            backgroundColor: const Color(0xFFBAE2FF),
+            backgroundColor: const Color(0xFFF0F4F8),
             elevation: 0,
             automaticallyImplyLeading: false,
-            title: Text('ตั้งค่า', style: GoogleFonts.kanit(color: const Color(0xFF0D47A1), fontWeight: FontWeight.bold)),
+            title: Text('ตั้งค่า', style: GoogleFonts.kanit(color: const Color(0xFF0D47A1), fontWeight: FontWeight.bold, fontSize: 24)),
           ),
           body: ListView(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
             children: [
               _currentUser == null
                   ? const Center(child: CircularProgressIndicator())
@@ -89,23 +87,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 24),
 
               _buildSectionTitle('บัญชี', context),
-              _buildSettingsTile(
-                icon: Icons.logout,
-                color: Colors.red,
-                title: 'ออกจากระบบ',
-                onTap: () => _showLogoutConfirmationDialog(context),
+              _buildSettingsCard(
+                children: [
+                   _buildSettingsTile(
+                    icon: Icons.logout,
+                    color: Colors.red.shade700,
+                    title: 'ออกจากระบบ',
+                    onTap: () => _showLogoutConfirmationDialog(context),
+                  ),
+                ]
               ),
               const SizedBox(height: 24),
               
               _buildSectionTitle('ทั่วไป', context),
-              _buildSettingsTile(
-                icon: Icons.language_outlined,
-                color: const Color(0xFF0D47A1),
-                title: 'ภาษา',
-                trailing: Text('ไทย', style: GoogleFonts.kanit(color: Colors.grey)),
-                onTap: () {},
-              ),
-              const Divider(),
+              _buildSettingsCard(
+                children: [
+                  _buildSettingsTile(
+                    icon: Icons.language_outlined,
+                    color: const Color(0xFF0D47A1),
+                    title: 'ภาษา',
+                    trailing: Text('ไทย', style: GoogleFonts.kanit(color: Colors.grey.shade600)),
+                    onTap: () {},
+                  ),
+                ]
+              )
             ],
           ),
         );
@@ -113,73 +118,104 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // Profile Header from the first redesign
   Widget _buildProfileHeader(app_user.User user) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 5,
-          )
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: const Color(0xFF0D47A1).withOpacity(0.1),
-            child: Text(
-              user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
-              style: GoogleFonts.kanit(
-                color: const Color(0xFF0D47A1),
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+    return Padding(
+      padding: const EdgeInsets.all(13.0),
+      child: Card(
+        elevation: 8.0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Image.asset(
+                'assets/images/h4.jpg',
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
               ),
-            ),
+              Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.black.withOpacity(0.1), Colors.black.withOpacity(0.7)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 200,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircleAvatar(
+                      radius: 45,
+                      backgroundColor: Colors.white,
+                      child: CircleAvatar(
+                        radius: 42,
+                        backgroundColor: const Color(0xFF0D47A1).withOpacity(0.1),
+                        child: Text(
+                          user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                          style: GoogleFonts.kanit(
+                            color: const Color(0xFF0D47A1),
+                            fontSize: 40,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      user.name,
+                      style: GoogleFonts.kanit(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      user.position,
+                      style: GoogleFonts.kanit(
+                        fontSize: 16,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user.name,
-                  style: GoogleFonts.kanit(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  user.position,
-                  style: GoogleFonts.kanit(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          )
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildSectionTitle(String title, BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 16.0, bottom: 8.0),
+      padding: const EdgeInsets.only(bottom: 12.0, left: 4.0),
       child: Text(
         title,
         style: GoogleFonts.kanit(
-          fontSize: 16,
+          fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: const Color(0xFF0D47A1),
+          color: Colors.grey.shade800,
         ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsCard({required List<Widget> children}) {
+    return Card(
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        children: children,
       ),
     );
   }
@@ -194,9 +230,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final itemColor = color ?? Theme.of(context).textTheme.bodyLarge?.color;
 
     return ListTile(
-      leading: Icon(icon, color: itemColor),
-      title: Text(title, style: GoogleFonts.kanit(color: itemColor)),
-      trailing: trailing,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: (itemColor ?? Colors.grey).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: itemColor),
+      ),
+      title: Text(title, style: GoogleFonts.kanit(fontWeight: FontWeight.w600)),
+      trailing: trailing ?? const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
       onTap: onTap,
     );
   }

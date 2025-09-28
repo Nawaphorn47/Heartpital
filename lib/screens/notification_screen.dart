@@ -4,10 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../models/notification_model.dart';
 import '../models/patient_model.dart';
 import '../services/notification_service.dart';
 import '../services/patient_service.dart';
+import '../models/history_model.dart';
+import '../services/history_service.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -19,6 +23,7 @@ class NotificationScreen extends StatefulWidget {
 class _NotificationScreenState extends State<NotificationScreen> {
   final NotificationService _notificationService = NotificationService();
   final PatientService _patientService = PatientService();
+  final HistoryService _historyService = HistoryService();
   Stream<List<Map<String, dynamic>>>? _combinedStream;
   Timer? _timer;
 
@@ -39,38 +44,38 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
 
     setState(() {
-      // getPatients() จะดึงข้อมูลผู้ป่วยเฉพาะของ user ที่ login อยู่แล้ว (จากไฟล์ patient_service)
       _combinedStream = _patientService.getPatients().switchMap((myPatients) {
-        
-        // ดึง ID ของผู้ป่วยทั้งหมดที่ user คนนี้สร้าง
         final myPatientIds = myPatients.map((p) => p.id!).toList();
 
         if (myPatientIds.isEmpty) {
           return Stream.value([]);
         }
 
-        // ดึงการแจ้งเตือนทั้งหมด แล้วกรองเอาเฉพาะอันที่เกี่ยวกับผู้ป่วยของ user คนนี้
         return _notificationService.getNotifications().map((allNotifications) {
-          
           final myNotifications = allNotifications
               .where((n) => myPatientIds.contains(n.patientId))
               .toList();
-          
+
           myNotifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-          
-          final Map<String, Patient> patientMap = {for (var p in myPatients) p.id!: p};
-          
-          return myNotifications.map((notification) {
-            return {
-              'notification': notification,
-              'patient': patientMap[notification.patientId]
-            };
-          }).where((item) => item['patient'] != null).toList();
+
+          final Map<String, Patient> patientMap = {
+            for (var p in myPatients) p.id!: p
+          };
+
+          return myNotifications
+              .map((notification) {
+                return {
+                  'notification': notification,
+                  'patient': patientMap[notification.patientId]
+                };
+              })
+              .where((item) => item['patient'] != null)
+              .toList();
         });
       });
     });
   }
-  
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -86,14 +91,19 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return 'เมื่อสักครู่';
   }
 
-  Future<void> _completeTask(NotificationItem notification, Patient patient) async {
+  Future<void> _completeTask(
+      NotificationItem notification, Patient patient) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('ยืนยันการเสร็จสิ้น', style: GoogleFonts.kanit()),
-        content: Text('คุณต้องการสิ้นสุดเคสของ "${patient.name}" หรือไม่?\nการดำเนินการนี้จะลบข้อมูลผู้ป่วยออกไป', style: GoogleFonts.kanit()),
+        content: Text(
+            'คุณต้องการสิ้นสุดเคสของ "${patient.name}" หรือไม่?\nข้อมูลจะถูกย้ายไปที่หน้าประวัติ',
+            style: GoogleFonts.kanit()),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text('ยกเลิก', style: GoogleFonts.kanit())),
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('ยกเลิก', style: GoogleFonts.kanit())),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: Text('ยืนยัน', style: GoogleFonts.kanit(color: Colors.red)),
@@ -103,18 +113,47 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
 
     if (confirmed == true) {
-      try {
-        await _notificationService.deleteNotification(notification.id!);
-        await _patientService.deletePatient(patient.id!);
+      final currentUser = auth.FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('เคสของ ${patient.name} เสร็จสิ้นแล้ว', style: GoogleFonts.kanit()), backgroundColor: Colors.green),
+            SnackBar(
+                content: Text('กรุณาเข้าสู่ระบบอีกครั้ง', style: GoogleFonts.kanit()),
+                backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+
+      try {
+        final history = History(
+          patientName: patient.name,
+          patientHn: patient.hn,
+          details: notification.details,
+          type: notification.type,
+          completedDate: Timestamp.now(),
+          userId: currentUser.uid, // บันทึก ID ของผู้ใช้ปัจจุบัน
+        );
+
+        await _historyService.addHistory(history);
+        await _notificationService.deleteNotification(notification.id!);
+        await _patientService.deletePatient(patient.id!);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(
+                    'เคสของ ${patient.name} เสร็จสิ้นและบันทึกในประวัติแล้ว',
+                    style: GoogleFonts.kanit()),
+                backgroundColor: Colors.green),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('เกิดข้อผิดพลาด: $e', style: GoogleFonts.kanit()), backgroundColor: Colors.red),
+            SnackBar(
+                content: Text('เกิดข้อผิดพลาด : $e', style: GoogleFonts.kanit()),
+                backgroundColor: Colors.red),
           );
         }
       }
@@ -123,7 +162,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   String _formatRemainingTime(Duration remaining) {
     if (remaining.isNegative) return "ถึงเวลาแล้ว";
-    
+
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     final hours = twoDigits(remaining.inHours);
     final minutes = twoDigits(remaining.inMinutes.remainder(60));
@@ -137,78 +176,116 @@ class _NotificationScreenState extends State<NotificationScreen> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Text('การแจ้งเตือน', style: GoogleFonts.kanit(color: const Color(0xFF0D47A1), fontWeight: FontWeight.bold)),
+        title: Text('การแจ้งเตือน',
+            style: GoogleFonts.kanit(
+                color: const Color(0xFF0D47A1), fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         elevation: 2,
         shadowColor: Colors.black.withOpacity(0.1),
       ),
       body: Container(
-         decoration: BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
-            colors: [const Color(0xFFBAE2FF).withOpacity(0.5), const Color(0xFF81D4FA).withOpacity(0.2)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFFBAE2FF).withOpacity(0.5),
+              const Color(0xFF81D4FA).withOpacity(0.2)
+            ],
           ),
         ),
         child: _combinedStream == null
-        ? const Center(child: CircularProgressIndicator())
-        : StreamBuilder<List<Map<String, dynamic>>>(
-          stream: _combinedStream,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) return Center(child: Text('เกิดข้อผิดพลาดบางอย่าง', style: GoogleFonts.kanit()));
-            if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.notifications_off_outlined, size: 80, color: Colors.grey.shade400),
-                    const SizedBox(height: 16),
-                    Text('ยังไม่มีการแจ้งเตือน', style: GoogleFonts.kanit(fontSize: 18, color: Colors.grey.shade600)),
-                  ],
-                ),
-              );
-            }
+            ? const Center(child: CircularProgressIndicator())
+            : StreamBuilder<List<Map<String, dynamic>>>(
+                stream: _combinedStream,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                        child: Text('เกิดข้อผิดพลาดบางอย่าง',
+                            style: GoogleFonts.kanit()));
+                  }
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.notifications_off_outlined,
+                              size: 80, color: Colors.grey.shade400),
+                          const SizedBox(height: 16),
+                          Text('ยังไม่มีการแจ้งเตือน',
+                              style: GoogleFonts.kanit(
+                                  fontSize: 18, color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    );
+                  }
 
-            final notificationsData = snapshot.data!;
+                  final notificationsData = snapshot.data!;
 
-            return ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: notificationsData.length,
-              itemBuilder: (context, index) {
-                final item = notificationsData[index]['notification'] as NotificationItem;
-                final patient = notificationsData[index]['patient'] as Patient?;
-                
-                if (patient == null) {
-                  return const SizedBox.shrink(); 
-                }
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: notificationsData.length,
+                    itemBuilder: (context, index) {
+                      final item = notificationsData[index]['notification']
+                          as NotificationItem;
+                      final patient =
+                          notificationsData[index]['patient'] as Patient?;
 
-                return _buildNotificationCard(item, patient);
-              },
-            );
-          },
-        ),
+                      if (patient == null) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return _buildNotificationCard(item, patient);
+                    },
+                  );
+                },
+              ),
       ),
     );
   }
 
   Widget _buildNotificationCard(NotificationItem item, Patient patient) {
-    IconData iconData; Color color;
+    IconData iconData;
+    Color color;
     switch (item.type) {
-      case 'medication': iconData = Icons.medical_services_rounded; color = const Color(0xFF0D47A1); break;
-      case 'checkup': iconData = Icons.health_and_safety_rounded; color = Colors.green.shade200; break;
-      case 'alert': iconData = Icons.warning_amber_rounded; color = Colors.red.shade200; break;
-      case 'care': iconData = Icons.local_hospital_rounded; color = Colors.purple.shade200; break;
-      case 'NPO': iconData = Icons.no_food_rounded; color = Colors.orange.shade200; break;
-      default: iconData = Icons.notifications_rounded; color = Colors.grey.shade200; break;
+      case 'medication':
+        iconData = Icons.medical_services_rounded;
+        color = const Color(0xFF0D47A1);
+        break;
+      case 'checkup':
+        iconData = Icons.health_and_safety_rounded;
+        color = Colors.green.shade200;
+        break;
+      case 'alert':
+        iconData = Icons.warning_amber_rounded;
+        color = Colors.red.shade200;
+        break;
+      case 'care':
+        iconData = Icons.local_hospital_rounded;
+        color = Colors.purple.shade200;
+        break;
+      case 'NPO':
+        iconData = Icons.no_food_rounded;
+        color = Colors.orange.shade200;
+        break;
+      default:
+        iconData = Icons.notifications_rounded;
+        color = Colors.grey.shade200;
+        break;
     }
 
     String remainingTimeStr = '';
     Color remainingTimeColor = Colors.grey;
     if (item.appointmentTime != null) {
-      final remaining = item.appointmentTime!.toDate().difference(DateTime.now());
+      final remaining =
+          item.appointmentTime!.toDate().difference(DateTime.now());
       remainingTimeStr = _formatRemainingTime(remaining);
       if (!remaining.isNegative) {
-        remainingTimeColor = remaining.inMinutes < 15 ? Colors.red.shade700 : Colors.orange.shade800;
+        remainingTimeColor =
+            remaining.inMinutes < 15 ? Colors.red.shade700 : Colors.orange.shade800;
       } else {
         remainingTimeColor = Colors.green.shade700;
       }
@@ -216,7 +293,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 2, shadowColor: Colors.black.withOpacity(0.1),
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(0.1),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -227,19 +305,26 @@ class _NotificationScreenState extends State<NotificationScreen> {
               children: [
                 Icon(iconData, color: color, size: 28),
                 const SizedBox(width: 12),
-                Expanded(child: Text(item.details, style: GoogleFonts.kanit(fontWeight: FontWeight.w600, fontSize: 16, color: color))),
-                Text(_timeAgo(item.timestamp.toDate()), style: GoogleFonts.kanit(fontSize: 12, color: Colors.grey.shade600)),
+                Expanded(
+                    child: Text(item.details,
+                        style: GoogleFonts.kanit(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            color: color))),
+                Text(_timeAgo(item.timestamp.toDate()),
+                    style: GoogleFonts.kanit(
+                        fontSize: 12, color: Colors.grey.shade600)),
               ],
             ),
             const Divider(height: 24),
-            _buildDetailRow(Icons.person_outline, 'ผู้ป่วย:', patient.name),
-            _buildDetailRow(Icons.location_on_outlined, 'สถานที่:', '${patient.location}, ${patient.department}'),
-            
+            _buildDetailRow(Icons.person_outline, 'ผู้ป่วย :', patient.name),
+            _buildDetailRow(Icons.location_on_outlined, 'สถานที่ :',
+                '${patient.location}, ${patient.department}'),
             if (item.appointmentTime != null) ...[
               const SizedBox(height: 8),
-              _buildDetailRow(Icons.timer_outlined, 'เหลือเวลา:', remainingTimeStr, valueColor: remainingTimeColor),
+              _buildDetailRow(Icons.timer_outlined, 'เหลือเวลา :', remainingTimeStr,
+                  valueColor: remainingTimeColor),
             ],
-
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -250,7 +335,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 style: ElevatedButton.styleFrom(
                   foregroundColor: Colors.white,
                   backgroundColor: Colors.green.shade600,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             )
@@ -260,7 +346,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String title, String value, {Color? valueColor}) {
+  Widget _buildDetailRow(IconData icon, String title, String value,
+      {Color? valueColor}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: Row(
@@ -269,7 +356,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
           const SizedBox(width: 8),
           Text(title, style: GoogleFonts.kanit(color: Colors.grey.shade700)),
           const SizedBox(width: 8),
-          Expanded(child: Text(value, style: GoogleFonts.kanit(fontWeight: FontWeight.w500, color: valueColor))),
+          Expanded(
+              child: Text(value,
+                  style: GoogleFonts.kanit(
+                      fontWeight: FontWeight.w500, color: valueColor))),
         ],
       ),
     );

@@ -1,7 +1,7 @@
+// lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/user_service.dart';
 import '../models/user_model.dart';
 import 'main_screen_scaffold.dart';
@@ -34,7 +34,87 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  // <<< START: ฟังก์ชันใหม่สำหรับรีเซ็ตรหัสผ่าน >>>
+  Future<void> _showForgotPasswordDialog() async {
+    final TextEditingController emailResetController = TextEditingController();
+    final GlobalKey<FormState> resetFormKey = GlobalKey<FormState>();
+
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('รีเซ็ตรหัสผ่าน', style: GoogleFonts.kanit()),
+          content: Form(
+            key: resetFormKey,
+            child: TextFormField(
+              controller: emailResetController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'กรุณากรอกอีเมล',
+                hintText: 'example@email.com',
+                prefixIcon: const Icon(Icons.email_outlined),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              validator: (value) {
+                if (value == null ||
+                    value.trim().isEmpty ||
+                    !value.contains('@')) {
+                  return 'กรุณาใส่อีเมลที่ถูกต้อง';
+                }
+                return null;
+              },
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text('ยกเลิก', style: GoogleFonts.kanit()),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            ElevatedButton(
+              child: Text('ส่งอีเมล', style: GoogleFonts.kanit()),
+              onPressed: () async {
+                if (resetFormKey.currentState!.validate()) {
+                  final email = emailResetController.text.trim();
+                  try {
+                    await _auth.sendPasswordResetEmail(email: email);
+                    Navigator.of(context).pop(); // ปิด Dialog
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                            'ส่งลิงก์รีเซ็ตรหัสผ่านไปที่ $email แล้ว',
+                            style: GoogleFonts.kanit()),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  } on auth.FirebaseAuthException catch (e) {
+                    Navigator.of(context).pop(); // ปิด Dialog
+                    String errorMessage = 'เกิดข้อผิดพลาด';
+                    if (e.code == 'user-not-found') {
+                      errorMessage = 'ไม่พบผู้ใช้สำหรับอีเมลนี้';
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(errorMessage, style: GoogleFonts.kanit()),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+  // <<< END: ฟังก์ชันใหม่สำหรับรีเซ็ตรหัสผ่าน >>>
+
   Future<void> _submitAuthForm() async {
+    // ... (โค้ดส่วนนี้เหมือนเดิม)
     final isValid = _formKey.currentState?.validate() ?? false;
     if (!isValid) {
       return;
@@ -53,11 +133,11 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       } else {
         // สมัครสมาชิก
-        final auth.UserCredential userCredential = await _auth
-            .createUserWithEmailAndPassword(
-              email: _emailController.text.trim(),
-              password: _passwordController.text.trim(),
-            );
+        final auth.UserCredential userCredential =
+            await _auth.createUserWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
 
         // บันทึกข้อมูลผู้ใช้เพิ่มเติมลงใน Firestore
         if (userCredential.user != null) {
@@ -82,8 +162,8 @@ class _LoginScreenState extends State<LoginScreen> {
         errorMessage = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
       } else if (e.code == 'email-already-in-use') {
         errorMessage = 'อีเมลนี้ถูกใช้ในการสมัครสมาชิกแล้ว';
-      } else if (e.code == 'user-not-found') {
-        errorMessage = 'ไม่พบผู้ใช้ด้วยอีเมลนี้';
+      } else if (e.code == 'user-not-found' || e.code == 'invalid-credential') {
+        errorMessage = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
       } else if (e.code == 'wrong-password') {
         errorMessage = 'รหัสผ่านไม่ถูกต้อง';
       } else if (e.code == 'invalid-email') {
@@ -97,9 +177,11 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -127,6 +209,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        // ... (โค้ดส่วน TextFormField เหมือนเดิม)
                         Text(
                           _isLogin ? 'เข้าสู่ระบบ' : 'สมัครสมาชิก',
                           style: theme.textTheme.headlineMedium?.copyWith(
@@ -228,16 +311,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'คุณเลือก "ลืมรหัสผ่าน?"',
-                                      style: GoogleFonts.kanit(),
-                                    ),
-                                  ),
-                                );
-                              },
+                              // <<< เปลี่ยน onPressed ให้เรียกใช้ฟังก์ชันใหม่ >>>
+                              onPressed: _showForgotPasswordDialog,
                               child: Text(
                                 'ลืมรหัสผ่าน?',
                                 style: GoogleFonts.kanit(
@@ -253,7 +328,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           ElevatedButton(
                             onPressed: _submitAuthForm,
                             style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(30),
                               ),

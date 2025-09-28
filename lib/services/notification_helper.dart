@@ -7,20 +7,32 @@ class NotificationHelper {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  // เรียกใช้ฟังก์ชันนี้ใน main.dart เพื่อตั้งค่าเริ่มต้น
   static Future<void> initialize() async {
+    // --- การตั้งค่าสำหรับ iOS ---
+    // ขออนุญาตการแจ้งเตือน (Permission) บน iOS
+    const DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const InitializationSettings initializationSettings =
-        InitializationSettings(android: initializationSettingsAndroid);
+    // --- รวมการตั้งค่าของทุก Platform ---
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsIOS, // เพิ่มของ iOS เข้าไป
+    );
 
     await _notificationsPlugin.initialize(initializationSettings);
+    
+    // --- ตั้งค่า Timezone ---
     tz.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation('Asia/Bangkok')); // ตั้งค่าโซนเวลาเป็นของไทย
+    tz.setLocalLocation(tz.getLocation('Asia/Bangkok'));
   }
 
-  // ฟังก์ชันสำหรับแสดงการแจ้งเตือนแบบตั้งเวลา
   static Future<void> scheduleNotification({
     required int id,
     required String title,
@@ -33,18 +45,25 @@ class NotificationHelper {
       body,
       tz.TZDateTime.from(scheduledDate, tz.local),
       const NotificationDetails(
+        // ตั้งค่าการแจ้งเตือนของ Android
         android: AndroidNotificationDetails(
-          'main_channel', // ID ของ channel
-          'Main Channel', // ชื่อ Channel
+          'main_channel',
+          'Main Channel',
           channelDescription: 'Main channel for notifications',
           importance: Importance.max,
           priority: Priority.high,
           icon: '@mipmap/ic_launcher',
         ),
+        // ตั้งค่าการแจ้งเตือนของ iOS
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
       ),
-      androidAllowWhileIdle: true,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
+
+      // พารามิเตอร์สำหรับควบคุมการทำงานเบื้องหลัง
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
     );
   }
 }

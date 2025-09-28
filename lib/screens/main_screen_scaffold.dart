@@ -6,6 +6,7 @@ import 'notification_screen.dart';
 import 'patient_list_screen.dart';
 import 'setting_screen.dart';
 import 'patient_dashboard_screen.dart';
+import 'history_screen.dart'; // เพิ่ม import
 
 class MainScreenScaffold extends StatefulWidget {
   const MainScreenScaffold({super.key});
@@ -17,10 +18,12 @@ class MainScreenScaffold extends StatefulWidget {
 class _MainScreenScaffoldState extends State<MainScreenScaffold> {
   int _selectedIndex = 0;
 
+  // เพิ่ม HistoryScreen เข้าไปใน List
   static const List<Widget> _widgetOptions = <Widget>[
     PatientListScreen(),
     PatientDashboardScreen(),
     NotificationScreen(),
+    HistoryScreen(), // หน้าใหม่ที่เพิ่มเข้ามา
     SettingsScreen(),
   ];
 
@@ -65,14 +68,20 @@ class _MainScreenScaffoldState extends State<MainScreenScaffold> {
               label: 'ผู้ป่วย',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.show_chart_outlined),
-              activeIcon: Icon(Icons.show_chart),
-              label: 'แดชบอร์ด',
+              icon: Icon(Icons.lock_clock_outlined),
+              activeIcon: Icon(Icons.lock_clock),
+              label: 'ตารางเวลา',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.receipt_long_outlined),
               activeIcon: Icon(Icons.receipt_long),
               label: 'แจ้งเตือน',
+            ),
+            // เพิ่มไอคอนสำหรับหน้า History
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_outlined),
+              activeIcon: Icon(Icons.history),
+              label: 'ประวัติ',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.settings_outlined),
@@ -82,7 +91,8 @@ class _MainScreenScaffoldState extends State<MainScreenScaffold> {
           ],
           currentIndex: _selectedIndex,
           selectedItemColor: const Color(0xFF0D47A1), // สีไอคอนเมื่อเลือก
-          unselectedItemColor: const Color(0xFF0D47A1).withOpacity(0.6), // สีไอคอนเมื่อไม่ได้เลือก
+          unselectedItemColor:
+              const Color(0xFF0D47A1).withOpacity(0.6), // สีไอคอนเมื่อไม่ได้เลือก
           showUnselectedLabels: true,
           onTap: _onItemTapped,
           type: BottomNavigationBarType.fixed,

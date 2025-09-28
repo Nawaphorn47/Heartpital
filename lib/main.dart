@@ -6,7 +6,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_screen_scaffold.dart';
-import 'services/notification_helper.dart'; // [ADD] เพิ่ม import
+import 'services/notification_helper.dart';
+import 'package:flutter/foundation.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,8 +16,9 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
-  // [ADD] เรียกใช้งานการตั้งค่าเริ่มต้นของ Notification ที่นี่
-  await NotificationHelper.initialize(); 
+    if (!kIsWeb) {
+    await NotificationHelper.initialize();
+  }
 
   runApp(
     ChangeNotifierProvider(

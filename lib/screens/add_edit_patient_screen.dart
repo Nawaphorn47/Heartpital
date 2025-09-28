@@ -1,7 +1,8 @@
 // lib/screens/add_edit_patient_screen.dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:firebase_auth/firebase_auth.dart' as auth; // เพิ่ม import
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 import '../models/patient_model.dart';
 import '../models/notification_model.dart';
 import '../services/patient_service.dart';
@@ -132,7 +133,7 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
           department: _selectedDepartment!,
           isNPO: _isNPO,
           medicationTime: appointmentDateTime != null ? Timestamp.fromDate(appointmentDateTime) : null,
-          createdBy: currentUser.uid, // เพิ่ม createdBy
+          createdBy: currentUser.uid,
         );
 
         String patientId;
@@ -157,7 +158,7 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('เกิดข้อผิดพลาด: $e', style: GoogleFonts.kanit()), backgroundColor: Colors.red),
+            SnackBar(content: Text('เกิดข้อผิดพลาด : $e', style: GoogleFonts.kanit()), backgroundColor: Colors.red),
           );
         }
       } finally {
@@ -167,9 +168,8 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
   }
 
   Future<void> _createAndScheduleNotification(String patientId, String patientName, DateTime appointmentDateTime) async {
-    
     final reminderDateTime = appointmentDateTime.subtract(Duration(minutes: _selectedReminderMinutes!));
-    final details = _notificationDetailController.text.trim().isNotEmpty ? _notificationDetailController.text.trim() : 'ได้เวลาเตรียมตัว';
+    final details = _notificationDetailController.text.trim().isNotEmpty ? _notificationDetailController.text.trim() :   '';
     
     final notification = NotificationItem(
       patientId: patientId,
@@ -181,12 +181,14 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
     );
     await _notificationService.addNotification(notification);
 
-    await NotificationHelper.scheduleNotification(
-      id: notification.hashCode,
-      title: 'แจ้งเตือน: $_reminderType',
-      body: 'สำหรับผู้ป่วย: $patientName (นัดเวลา ${TimeOfDay.fromDateTime(appointmentDateTime).format(context)})',
-      scheduledDate: reminderDateTime,
-    );
+    if (!kIsWeb) {
+      await NotificationHelper.scheduleNotification(
+        id: notification.hashCode,
+        title: 'แจ้งเตือน : $_reminderType',
+        body: 'สำหรับผู้ป่วย : $patientName (นัดเวลา ${TimeOfDay.fromDateTime(appointmentDateTime).format(context)})',
+        scheduledDate: reminderDateTime,
+      );
+    }
   }
 
   @override
@@ -396,7 +398,7 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
       padding: const EdgeInsets.only(bottom: 16.0),
       child: ListTile(
         title: Text(
-          time == null ? label : 'เวลา: ${time.format(context)}', style: GoogleFonts.kanit(),
+          time == null ? label : 'เวลา : ${time.format(context)}', style: GoogleFonts.kanit(),
         ),
         leading: const Icon(Icons.access_time_outlined),
         trailing: const Icon(Icons.keyboard_arrow_down),
