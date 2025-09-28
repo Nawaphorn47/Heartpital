@@ -173,7 +173,7 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
     
     final notification = NotificationItem(
       patientId: patientId,
-      details: '${_reminderType!}: $details',
+      details: '${_reminderType!} : $details',
       type: 'care',
       timestamp: Timestamp.fromDate(reminderDateTime),
       appointmentTime: Timestamp.fromDate(appointmentDateTime),
@@ -215,7 +215,7 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
               _buildNPOCheckbox(),
               
               const SizedBox(height: 16),
-              _buildSectionTitle('เวลานัดหมาย / หัตถการ (สำคัญ)'),
+              _buildSectionTitle('เวลานัดหมาย'),
               _buildTimePicker(
                 time: _appointmentTime,
                 label: 'ตั้งเวลานัดหมาย',
@@ -226,7 +226,7 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
 
               if (_appointmentTime != null) ...[
                 const SizedBox(height: 16),
-                _buildSectionTitle('แจ้งเตือนล่วงหน้า (ไม่บังคับ)'),
+                _buildSectionTitle('แจ้งเตือนล่วงหน้า'),
                 _buildReminderTimeDropdown(),
               ],
 

@@ -71,7 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return Scaffold(
-          backgroundColor: const Color.fromARGB(255, 186, 226, 255),
+          backgroundColor: const Color.fromARGB(255, 172, 215, 255).withOpacity(0.5),
           appBar: AppBar(
             backgroundColor: const Color(0xFFF0F4F8),
             elevation: 0,
@@ -118,78 +118,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // Profile Header from the first redesign
   Widget _buildProfileHeader(app_user.User user) {
     return Padding(
-      padding: const EdgeInsets.all(13.0),
-      child: Card(
-        elevation: 8.0,
-        shape: RoundedRectangleBorder(
+      padding: const EdgeInsets.all(16.0),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Image.asset(
-                'assets/images/h4.jpg',
-                height: 200,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
-              Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.black.withOpacity(0.1), Colors.black.withOpacity(0.7)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                ),
-              ),
-              SizedBox(
-                height: 200,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircleAvatar(
-                      radius: 45,
-                      backgroundColor: Colors.white,
-                      child: CircleAvatar(
-                        radius: 42,
-                        backgroundColor: const Color(0xFF0D47A1).withOpacity(0.1),
-                        child: Text(
-                          user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
-                          style: GoogleFonts.kanit(
-                            color: const Color(0xFF0D47A1),
-                            fontSize: 40,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      user.name,
-                      style: GoogleFonts.kanit(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      user.position,
-                      style: GoogleFonts.kanit(
-                        fontSize: 16,
-                        color: Colors.white.withOpacity(0.9),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color.fromARGB(255, 231, 245, 255),
+              const Color.fromARGB(255, 194, 225, 255),
             ],
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              spreadRadius: 2,
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            CircleAvatar(
+              radius: 40,
+              backgroundColor: Colors.white,
+              child: Icon(
+                Icons.person,
+                size: 50,
+                color: const Color(0xFF0D47A1).withOpacity(0.8),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              user.name,
+              style: GoogleFonts.kanit(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF0D47A1),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              user.position,
+              style: GoogleFonts.kanit(
+                fontSize: 16,
+                color: const Color(0xFF0D47A1).withOpacity(0.9),
+              ),
+            ),
+          ],
         ),
       ),
     );

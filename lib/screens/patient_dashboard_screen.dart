@@ -15,9 +15,7 @@ class PatientDashboardScreen extends StatefulWidget {
 class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
   final PatientService _patientService = PatientService();
   late final Stream<List<Patient>> _patientsStream;
-
-  // Change to display all 24 hours
-  final List<int> _workingHours = List.generate(24, (index) => index); // 0:00 to 23:00
+  String _filterStatus = 'all'; // 'all', 'busy', 'free'
 
   @override
   void initState() {
@@ -36,7 +34,24 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
         grouped[hour]!.add(patient);
       }
     }
+    grouped.forEach((key, value) {
+      value.sort((a, b) => a.medicationTime!.toDate().compareTo(b.medicationTime!.toDate()));
+    });
     return grouped;
+  }
+
+  List<int> _getFilteredHours(Map<int, List<Patient>> groupedPatients) {
+    final allHours = List<int>.generate(24, (i) => i);
+    switch (_filterStatus) {
+      case 'busy':
+        return groupedPatients.keys.toList()..sort();
+      case 'free':
+        final busyHours = groupedPatients.keys.toSet();
+        return allHours.where((hour) => !busyHours.contains(hour)).toList();
+      case 'all':
+      default:
+        return allHours;
+    }
   }
 
   @override
@@ -45,7 +60,7 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(
-          'ตารางเวลาวันนี้',
+          'ตารางงานวันนี้',
           style: GoogleFonts.kanit(
             color: const Color(0xFF0D47A1),
             fontWeight: FontWeight.bold,
@@ -55,95 +70,65 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
         elevation: 2,
         shadowColor: Colors.black.withOpacity(0.1),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFFBAE2FF).withOpacity(0.5),
-              const Color(0xFF81D4FA).withOpacity(0.2)
-            ],
-          ),
-        ),
-        child: StreamBuilder<List<Patient>>(
-          stream: _patientsStream,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return Center(
-                  child: Text('เกิดข้อผิดพลาด: ${snapshot.error}',
-                      style: GoogleFonts.kanit()));
-            }
-
-            // Always build the timeline, even if there are no patients.
-            // If data is null, use an empty list.
-            final patients = snapshot.data ?? [];
-            final groupedPatients = _groupPatientsByHour(patients);
-
-            return ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: _workingHours.length,
-              itemBuilder: (context, index) {
-                final hour = _workingHours[index];
-                final patientsForThisHour = groupedPatients[hour] ?? [];
-                return _buildTimeSlotRow(hour, patientsForThisHour);
-              },
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTimeSlotRow(int hour, List<Patient> patients) {
-    final timeFormat = DateFormat('HH:mm');
-    final startTime = timeFormat.format(DateTime(0, 0, 0, hour));
-    final endTime = timeFormat.format(DateTime(0, 0, 0, hour, 59));
-    final bool isBusy = patients.isNotEmpty;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      body: Column(
         children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              '$startTime\n-\n$endTime',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.kanit(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey.shade700,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
+          _buildFilterButtons(),
           Expanded(
-            child: Card(
-              elevation: 2,
-              margin: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              color: isBusy ? Colors.red.shade50 : Colors.teal.shade50,
-              child: Container(
-                padding: const EdgeInsets.all(12.0),
-                decoration: BoxDecoration(
-                   borderRadius: BorderRadius.circular(12),
-                   border: Border(
-                     left: BorderSide(
-                       color: isBusy ? Colors.red.shade400 : Colors.teal.shade400,
-                       width: 5,
-                     )
-                   )
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFFBAE2FF).withOpacity(0.5),
+                    const Color(0xFF81D4FA).withOpacity(0.2)
+                  ],
                 ),
-                child: isBusy
-                    ? _buildBusySlot(patients)
-                    : _buildFreeSlot(),
+              ),
+              child: StreamBuilder<List<Patient>>(
+                stream: _patientsStream,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Center(
+                        child: Text('เกิดข้อผิดพลาด: ${snapshot.error}',
+                            style: GoogleFonts.kanit()));
+                  }
+
+                  final patients = snapshot.data ?? [];
+                  final groupedPatients = _groupPatientsByHour(patients);
+                  final filteredHours = _getFilteredHours(groupedPatients);
+
+                  if (filteredHours.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.event_note, size: 80, color: Colors.grey.shade400),
+                          const SizedBox(height: 16),
+                          Text(
+                              _filterStatus == 'busy'
+                                  ? 'วันนี้ไม่มีนัดหมายผู้ป่วย'
+                                  : 'ไม่มีช่วงเวลาว่าง',
+                              style: GoogleFonts.kanit(
+                                  fontSize: 18, color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16.0),
+                    itemCount: filteredHours.length,
+                    itemBuilder: (context, index) {
+                      final hour = filteredHours[index];
+                      final patientsForThisHour = groupedPatients[hour] ?? [];
+                      return _buildTimeSlotSection(hour, patientsForThisHour);
+                    },
+                  );
+                },
               ),
             ),
           ),
@@ -152,47 +137,206 @@ class _PatientDashboardScreenState extends State<PatientDashboardScreen> {
     );
   }
 
-  Widget _buildFreeSlot() {
-    return Row(
-      children: [
-        Icon(Icons.check_circle_outline, color: Colors.teal.shade700),
-        const SizedBox(width: 8),
-        Text(
-          'ว่าง',
-          style: GoogleFonts.kanit(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.teal.shade800,
+  Widget _buildFilterButtons() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildFilterButton('ทั้งหมด', 'all'),
+          _buildFilterButton('ไม่ว่าง', 'busy'),
+          _buildFilterButton('ว่าง', 'free'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterButton(String text, String status) {
+    final isSelected = _filterStatus == status;
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+        child: ElevatedButton(
+          onPressed: () {
+            setState(() {
+              _filterStatus = status;
+            });
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: isSelected ? const Color(0xFF0D47A1) : Colors.grey.shade200,
+            foregroundColor: isSelected ? Colors.white : Colors.black87,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: isSelected ? 4 : 0,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
+          child: Text(
+            text,
+            style: GoogleFonts.kanit(fontSize: 14),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTimeSlotSection(int hour, List<Patient> patients) {
+    final bool isBusy = patients.isNotEmpty;
+    final timeFormat = DateFormat('HH:mm น.');
+    final hourDisplay = timeFormat.format(DateTime(0, 0, 0, hour));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
+          child: Text(
+            '$hourDisplay',
+            style: GoogleFonts.kanit(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: isBusy ? const Color(0xFFD32F2F) : Colors.grey.shade700,
+            ),
+          ),
+        ),
+        if (isBusy)
+          ...patients.map((patient) => _buildPatientCard(patient)).toList()
+        else
+          _buildFreeSlotCard(),
+        const Divider(height: 24, thickness: 1.0, color: Color(0xFFE3F2FD)),
       ],
     );
   }
 
-  Widget _buildBusySlot(List<Patient> patients) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-         Text(
-          'ไม่ว่าง (${patients.length} เคส)',
-          style: GoogleFonts.kanit(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.red.shade800,
+  Widget _buildPatientCard(Patient patient) {
+    final timeFormat = DateFormat('HH:mm น.');
+    final patientTimeDisplay = patient.medicationTime != null
+        ? timeFormat.format(patient.medicationTime!.toDate())
+        : 'เวลาไม่ระบุ';
+
+    return Card(
+      elevation: 6,
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      shadowColor: const Color(0xFFD32F2F).withOpacity(0.4),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [Colors.red.shade50, Colors.red.shade100],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8.0,
-          runSpacing: 4.0,
-          children: patients.map((patient) => Chip(
-            avatar: const Icon(Icons.person, size: 16, color: Colors.white),
-            label: Text(patient.name, style: GoogleFonts.kanit(color: Colors.white)),
-            backgroundColor: Colors.red.shade400,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          )).toList(),
-        )
-      ],
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(2, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(Icons.person_rounded, color: const Color(0xFFD32F2F), size: 30),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      patient.name,
+                      style: GoogleFonts.kanit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red.shade900,
+                      ),
+                    ),
+                    Text(
+                      'HN: ${patient.hn}',
+                      style: GoogleFonts.kanit(
+                        fontSize: 12,
+                        color: Colors.red.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                patientTimeDisplay,
+                style: GoogleFonts.kanit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red.shade900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFreeSlotCard() {
+    return Card(
+      elevation: 4,
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      shadowColor: Colors.grey.shade400.withOpacity(0.3),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [Colors.white, Colors.grey.shade100],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(2, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(Icons.check_circle_outline, color: Colors.grey.shade600, size: 30),
+              ),
+              const SizedBox(width: 16),
+              Text(
+                'ว่าง',
+                style: GoogleFonts.kanit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

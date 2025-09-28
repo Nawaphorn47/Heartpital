@@ -30,9 +30,23 @@ class _PatientListScreenState extends State<PatientListScreen>
   String _selectedDepartment = 'ทุกแผนก';
   String _searchQuery = '';
 
-  final List<String> _buildings = [ 'ทุกตึก', 'A', 'B', 'C', 'D', 'E' ];
-  final List<String> _departments = [ 'ทุกแผนก', 'แผนกผู้ป่วยนอก (OPD)', 'แผนกผู้ป่วยใน (IPD)', 'แผนกฉุกเฉิน (ER)', 'แผนกผ่าตัด (OR)', 'แผนกห้องปฏิบัติการ', 'แผนกรังสีและภาพวินิจฉัย', 'แผนกกายภาพบำบัด', 'แผนกสูตินรีเวช', 'แผนกกุมารเวช', 'แผนกอายุรกรรม', 'แผนกศัลยกรรม', 'แผนกเภสัชกรรม' ];
-  
+  final List<String> _buildings = ['ทุกตึก', 'A', 'B', 'C', 'D', 'E'];
+  final List<String> _departments = [
+    'ทุกแผนก',
+    'แผนกผู้ป่วยนอก (OPD)',
+    'แผนกผู้ป่วยใน (IPD)',
+    'แผนกฉุกเฉิน (ER)',
+    'แผนกผ่าตัด (OR)',
+    'แผนกห้องปฏิบัติการ',
+    'แผนกรังสีและภาพวินิจฉัย',
+    'แผนกกายภาพบำบัด',
+    'แผนกสูตินรีเวช',
+    'แผนกกุมารเวช',
+    'แผนกอายุรกรรม',
+    'แผนกศัลยกรรม',
+    'แผนกเภสัชกรรม'
+  ];
+
   Stream<List<Patient>>? _patientsStream;
 
   @override
@@ -58,20 +72,20 @@ class _PatientListScreenState extends State<PatientListScreen>
       if (mounted) {
         setState(() {
           _currentUser = user;
-          _updateStream(); // Call updateStream after user is loaded
+          _updateStream();
         });
       }
     } else {
-       if (mounted) {
+      if (mounted) {
         setState(() {
           _patientsStream = Stream.value([]);
         });
-       }
+      }
     }
   }
 
   void _updateStream() {
-    if (_currentUser == null) return; // Don't query if user is not loaded
+    if (_currentUser == null) return;
     setState(() {
       _patientsStream = _patientService.getPatients(
         building: _selectedBuilding,
@@ -100,14 +114,18 @@ class _PatientListScreenState extends State<PatientListScreen>
             children: [
               const Icon(Icons.warning_amber_rounded, color: Colors.orange),
               const SizedBox(width: 10),
-              Text("ยืนยันการลบ", style: GoogleFonts.kanit(fontWeight: FontWeight.bold)),
+              Text("ยืนยันการลบ",
+                  style: GoogleFonts.kanit(fontWeight: FontWeight.bold)),
             ],
           ),
-          content: Text("คุณต้องการลบข้อมูลผู้ป่วย \"$patientName\" ใช่หรือไม่?\nการดำเนินการนี้ไม่สามารถยกเลิกได้", style: GoogleFonts.kanit()),
+          content: Text(
+              "คุณต้องการลบข้อมูลผู้ป่วย \"$patientName\" ใช่หรือไม่?\nการดำเนินการนี้ไม่สามารถยกเลิกได้",
+              style: GoogleFonts.kanit()),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text("ยกเลิก", style: GoogleFonts.kanit(color: Colors.grey.shade700)),
+              child: Text("ยกเลิก",
+                  style: GoogleFonts.kanit(color: Colors.grey.shade700)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
@@ -126,12 +144,11 @@ class _PatientListScreenState extends State<PatientListScreen>
     if (confirmed == true) {
       await _patientService.deletePatient(patientId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('ลบผู้ป่วย "$patientName" สำเร็จ', style: GoogleFonts.kanit()),
-            backgroundColor: Colors.green,
-          )
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('ลบผู้ป่วย "$patientName" สำเร็จ',
+              style: GoogleFonts.kanit()),
+          backgroundColor: Colors.green,
+        ));
       }
     }
   }
@@ -154,29 +171,29 @@ class _PatientListScreenState extends State<PatientListScreen>
         backgroundColor: const Color(0xFF0D47A1),
         child: const Icon(Icons.add, color: Colors.white),
       ),
-      body: _patientsStream == null 
-        ? const Center(child: CircularProgressIndicator())
-        : StreamBuilder<List<Patient>>(
-        stream: _patientsStream,
-        builder: (context, snapshot) {
-          final patients = snapshot.data ?? [];
-          return CustomScrollView(
-            slivers: [
-              _buildSliverAppBar(patients.length),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: _buildFilterSection(),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                sliver: _buildPatientList(snapshot),
-              ),
-            ],
-          );
-        },
-      ),
+      body: _patientsStream == null
+          ? const Center(child: CircularProgressIndicator())
+          : StreamBuilder<List<Patient>>(
+              stream: _patientsStream,
+              builder: (context, snapshot) {
+                final patients = snapshot.data ?? [];
+                return CustomScrollView(
+                  slivers: [
+                    _buildSliverAppBar(patients.length),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: _buildFilterSection(),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      sliver: _buildPatientList(snapshot),
+                    ),
+                  ],
+                );
+              },
+            ),
     );
   }
 
@@ -192,24 +209,27 @@ class _PatientListScreenState extends State<PatientListScreen>
       flexibleSpace: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
           final top = constraints.biggest.height;
-          final isCollapsed = top <= MediaQuery.of(context).padding.top + kToolbarHeight;
+          final isCollapsed =
+              top <= MediaQuery.of(context).padding.top + kToolbarHeight;
 
           return FlexibleSpaceBar(
             centerTitle: true,
             title: isCollapsed
-                ? Text('รายชื่อผู้ป่วย', style: GoogleFonts.kanit(color: accentColor, fontWeight: FontWeight.bold))
+                ? Text('รายชื่อผู้ป่วย',
+                    style: GoogleFonts.kanit(
+                        color: accentColor, fontWeight: FontWeight.bold))
                 : null,
             background: Stack(
               fit: StackFit.expand,
               children: [
                 Container(
-                   decoration: BoxDecoration(
+                  decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        const Color(0xFFBAE2FF).withOpacity(0.8),
-                        const Color(0xFF81D4FA).withOpacity(0.5),
+const Color.fromARGB(255, 182, 224, 244).withOpacity(0.2),
+              const Color.fromARGB(255, 116, 188, 255).withOpacity(0.5),
                       ],
                     ),
                   ),
@@ -217,10 +237,12 @@ class _PatientListScreenState extends State<PatientListScreen>
                 Positioned(
                   top: -20,
                   right: -30,
-                  child: Icon(Icons.medical_information_rounded, size: 150, color: Colors.white.withOpacity(0.3)),
+                  child: Icon(Icons.medical_information_rounded,
+                      size: 150, color: Colors.white.withOpacity(0.3)),
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 80.0),
+                  padding:
+                      const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 80.0),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.end,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,7 +255,7 @@ class _PatientListScreenState extends State<PatientListScreen>
                           color: accentColor,
                         ),
                       ),
-                       Text(
+                      Text(
                         'ทั้งหมด $patientCount คน',
                         style: GoogleFonts.kanit(
                           fontSize: 16,
@@ -286,7 +308,8 @@ class _PatientListScreenState extends State<PatientListScreen>
                 )
               : null,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         ),
       ),
     );
@@ -315,8 +338,9 @@ class _PatientListScreenState extends State<PatientListScreen>
       ],
     );
   }
-  
-  Widget _buildDropdown(String value, List<String> items, ValueChanged<String?> onChanged, String label) {
+
+  Widget _buildDropdown(String value, List<String> items,
+      ValueChanged<String?> onChanged, String label) {
     return DropdownButtonFormField<String>(
       value: value,
       items: items.map((String val) {
@@ -350,11 +374,16 @@ class _PatientListScreenState extends State<PatientListScreen>
   }
 
   Widget _buildPatientList(AsyncSnapshot<List<Patient>> snapshot) {
-    if (snapshot.connectionState == ConnectionState.waiting && snapshot.data == null) {
-      return const SliverFillRemaining(child: Center(child: CircularProgressIndicator()));
+    if (snapshot.connectionState == ConnectionState.waiting &&
+        snapshot.data == null) {
+      return const SliverFillRemaining(
+          child: Center(child: CircularProgressIndicator()));
     }
     if (snapshot.hasError) {
-      return SliverFillRemaining(child: Center(child: Text('เกิดข้อผิดพลาด: ${snapshot.error}', style: GoogleFonts.kanit(color: Colors.red))));
+      return SliverFillRemaining(
+          child: Center(
+              child: Text('เกิดข้อผิดพลาด: ${snapshot.error}',
+                  style: GoogleFonts.kanit(color: Colors.red))));
     }
     final patients = snapshot.data ?? [];
     if (patients.isEmpty) {
@@ -365,7 +394,9 @@ class _PatientListScreenState extends State<PatientListScreen>
             children: [
               Icon(Icons.person_search, size: 80, color: Colors.grey.shade400),
               const SizedBox(height: 16),
-              Text('ไม่พบข้อมูลผู้ป่วย', style: GoogleFonts.kanit(fontSize: 18, color: Colors.grey.shade600)),
+              Text('ไม่พบข้อมูลผู้ป่วย',
+                  style: GoogleFonts.kanit(
+                      fontSize: 18, color: Colors.grey.shade600)),
             ],
           ),
         ),
@@ -392,11 +423,12 @@ class _PatientListScreenState extends State<PatientListScreen>
 
   Widget _buildPatientCard(Patient patient) {
     const Color accentColor = Color(0xFF0D47A1);
+    final String initial = patient.name.isNotEmpty ? patient.name[0].toUpperCase() : '';
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.1),
+      elevation: 8,
+      shadowColor: accentColor.withOpacity(0.2),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -407,51 +439,61 @@ class _PatientListScreenState extends State<PatientListScreen>
             ),
           );
         },
-        child: IntrinsicHeight(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                width: 6,
-                decoration: const BoxDecoration(
-                  color: accentColor,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
-                    bottomLeft: Radius.circular(16),
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: accentColor.withOpacity(0.1),
+                  border: Border.all(color: accentColor, width: 2),
+                ),
+                child: Center(
+                  child: Text(
+                    initial,
+                    style: GoogleFonts.kanit(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: accentColor,
+                    ),
                   ),
                 ),
               ),
+              const SizedBox(width: 16),
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                           Expanded(
-                            child: Text(
-                              patient.name,
-                              style: GoogleFonts.kanit(fontSize: 20, fontWeight: FontWeight.bold, color: accentColor),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text('HN: ${patient.hn}', style: GoogleFonts.kanit(fontSize: 12, color: accentColor, fontWeight: FontWeight.w500)),
-                        ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      patient.name,
+                      style: GoogleFonts.kanit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
-                      const Divider(height: 24, thickness: 0.5),
-                      _buildPatientDetail(Icons.apartment_rounded, patient.building),
-                      const SizedBox(height: 8),
-                      _buildPatientDetail(Icons.local_hospital_rounded, patient.department),
-                    ],
-                  ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      'HN: ${patient.hn}',
+                      style: GoogleFonts.kanit(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildPatientDetail(Icons.apartment_rounded, patient.building),
+                    _buildPatientDetail(Icons.local_hospital_rounded, patient.department),
+                  ],
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                icon: const Icon(Icons.delete_outline_rounded,
+                    color: Colors.redAccent, size: 28),
                 tooltip: 'ลบผู้ป่วย',
                 onPressed: () => _deletePatient(patient.id!, patient.name),
               ),
@@ -463,18 +505,21 @@ class _PatientListScreenState extends State<PatientListScreen>
   }
 
   Widget _buildPatientDetail(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: Colors.grey.shade600),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: GoogleFonts.kanit(fontSize: 14, color: Colors.grey.shade800),
-            overflow: TextOverflow.ellipsis,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.grey.shade600),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.kanit(fontSize: 14, color: Colors.grey.shade800),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

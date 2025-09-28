@@ -189,8 +189,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              const Color(0xFFBAE2FF).withOpacity(0.5),
-              const Color(0xFF81D4FA).withOpacity(0.2)
+            const Color.fromARGB(255, 116, 188, 255).withOpacity(0.5),
+              const Color.fromARGB(255, 204, 239, 255).withOpacity(0.2),
             ],
           ),
         ),
@@ -265,7 +265,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         break;
       case 'care':
         iconData = Icons.local_hospital_rounded;
-        color = Colors.purple.shade200;
+        color = const Color.fromARGB(255, 129, 74, 139);
         break;
       case 'NPO':
         iconData = Icons.no_food_rounded;
