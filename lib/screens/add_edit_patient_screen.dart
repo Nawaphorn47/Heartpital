@@ -145,9 +145,11 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
           patientId = docRef.id;
         }
 
-        if (appointmentDateTime != null && _selectedReminderMinutes != null) {
+        // <<< START: โค้ดที่แก้ไข
+        if (appointmentDateTime != null) {
           await _createAndScheduleNotification(patientId, patient.name, appointmentDateTime);
         }
+        // >>> END: โค้ดที่แก้ไข
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -168,12 +170,17 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
   }
 
   Future<void> _createAndScheduleNotification(String patientId, String patientName, DateTime appointmentDateTime) async {
-    final reminderDateTime = appointmentDateTime.subtract(Duration(minutes: _selectedReminderMinutes!));
-    final details = _notificationDetailController.text.trim().isNotEmpty ? _notificationDetailController.text.trim() :   '';
+    // <<< START: โค้ดที่แก้ไข
+    final reminderMinutes = _selectedReminderMinutes ?? 30;
+    final reminderType = _reminderType ?? 'นัดหมายผู้ป่วย';
+    final details = _notificationDetailController.text.trim().isNotEmpty ? _notificationDetailController.text.trim() : 'แจ้งเตือนเวลานัดหมาย';
+    // >>> END: โค้ดที่แก้ไข
+    
+    final reminderDateTime = appointmentDateTime.subtract(Duration(minutes: reminderMinutes));
     
     final notification = NotificationItem(
       patientId: patientId,
-      details: '${_reminderType!} : $details',
+      details: '${reminderType} : $details',
       type: 'care',
       timestamp: Timestamp.fromDate(reminderDateTime),
       appointmentTime: Timestamp.fromDate(appointmentDateTime),
@@ -184,7 +191,7 @@ class _AddEditPatientScreenState extends State<AddEditPatientScreen> {
     if (!kIsWeb) {
       await NotificationHelper.scheduleNotification(
         id: notification.hashCode,
-        title: 'แจ้งเตือน : $_reminderType',
+        title: 'แจ้งเตือน : $reminderType',
         body: 'สำหรับผู้ป่วย : $patientName (นัดเวลา ${TimeOfDay.fromDateTime(appointmentDateTime).format(context)})',
         scheduledDate: reminderDateTime,
       );
