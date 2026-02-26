@@ -18,7 +18,6 @@ class UserService {
     });
   }
   
-  // [NEW] เพิ่มฟังก์ชันนี้เข้าไป
   /// ดึงข้อมูลผู้ใช้คนเดียวจาก ID
   Future<User?> getUserById(String id) async {
     final docSnapshot = await _collection.doc(id).get();

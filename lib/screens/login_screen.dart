@@ -34,7 +34,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // <<< START: ฟังก์ชันใหม่สำหรับรีเซ็ตรหัสผ่าน >>>
   Future<void> _showForgotPasswordDialog() async {
     final TextEditingController emailResetController = TextEditingController();
     final GlobalKey<FormState> resetFormKey = GlobalKey<FormState>();
@@ -114,7 +113,6 @@ class _LoginScreenState extends State<LoginScreen> {
   // <<< END: ฟังก์ชันใหม่สำหรับรีเซ็ตรหัสผ่าน >>>
 
   Future<void> _submitAuthForm() async {
-    // ... (โค้ดส่วนนี้เหมือนเดิม)
     final isValid = _formKey.currentState?.validate() ?? false;
     if (!isValid) {
       return;
